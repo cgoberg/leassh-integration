@@ -11,6 +11,7 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import LeasshRuntime
@@ -40,14 +41,15 @@ async def async_setup_entry(
             if not name or name in seen:
                 continue
             seen.add(name)
+            device = node_device(hass, entry, name)
             new.extend(
                 [
                     NodeBinarySensor(
-                        coordinator, entry, name, BinarySensorDeviceClass.CONNECTIVITY,
+                        coordinator, device, name, BinarySensorDeviceClass.CONNECTIVITY,
                         "online", "reachable",
                     ),
                     NodeBinarySensor(
-                        coordinator, entry, name, BinarySensorDeviceClass.OCCUPANCY,
+                        coordinator, device, name, BinarySensorDeviceClass.OCCUPANCY,
                         "human_present", "human_present",
                     ),
                 ]
@@ -97,7 +99,7 @@ class NodeBinarySensor(CoordinatorEntity[LeasshCoordinator], BinarySensorEntity)
     def __init__(
         self,
         coordinator: LeasshCoordinator,
-        entry: ConfigEntry,
+        device: DeviceInfo,
         node_name: str,
         device_class: BinarySensorDeviceClass,
         key: str,
@@ -108,8 +110,8 @@ class NodeBinarySensor(CoordinatorEntity[LeasshCoordinator], BinarySensorEntity)
         self._field = field
         self._attr_device_class = device_class
         self._attr_translation_key = key
-        self._attr_unique_id = f"{entry.entry_id}_{node_name}_{key}"
-        self._attr_device_info = node_device(entry, node_name)
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_{node_name}_{key}"
+        self._attr_device_info = device
 
     def _node_data(self) -> dict[str, Any] | None:
         for node in self.coordinator.data.get("nodes", []):

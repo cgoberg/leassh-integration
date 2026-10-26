@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.button import ButtonEntity
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -57,7 +58,7 @@ async def async_setup_entry(
                     continue
                 seen.add(key)
                 new.append(
-                    ActionButton(runtime, entry, name, verb, catalog_desc(catalog, verb))
+                    ActionButton(runtime, node_device(hass, entry, name), name, verb, catalog_desc(catalog, verb))
                 )
         if new:
             async_add_entities(new)
@@ -82,7 +83,7 @@ class ActionButton(ButtonEntity):
     def __init__(
         self,
         runtime: LeasshRuntime,
-        entry: ConfigEntry,
+        device: DeviceInfo,
         node_name: str,
         verb: str,
         description: str,
@@ -90,8 +91,9 @@ class ActionButton(ButtonEntity):
         self._runtime = runtime
         self._node = node_name
         self._verb = verb
-        self._attr_unique_id = f"{entry.entry_id}_{node_name}_{verb}"
-        self._attr_device_info = node_device(entry, node_name)
+        self._entry = runtime.coordinator.config_entry
+        self._attr_unique_id = f"{self._entry.entry_id}_{node_name}_{verb}"
+        self._attr_device_info = device
         self._attr_translation_key = "action_button"
         self._attr_translation_placeholders = {"action": verb.replace("_node", "").replace("_", " ")}
         self._attr_icon = _ICON_BY_VERB.get(verb, "mdi:flash")

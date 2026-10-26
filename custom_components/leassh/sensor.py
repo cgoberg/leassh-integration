@@ -12,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.device_registry import DeviceInfo
 
 from . import LeasshRuntime
 from .const import DOMAIN
@@ -36,12 +37,13 @@ async def async_setup_entry(
             if not name or name in seen:
                 continue
             seen.add(name)
+            device = node_device(hass, entry, name)
             new.extend(
                 [
-                    NodeSensor(coordinator, entry, name, "activity", None, None, "mdi:account-clock"),
-                    NodeSensor(coordinator, entry, name, "cpu_percent", "%", float, "mdi:cpu-64-bit"),
-                    NodeSensor(coordinator, entry, name, "ram_percent", "%", float, "mdi:memory"),
-                    NodeSensor(coordinator, entry, name, "load", None, None, "mdi:speedometer"),
+                    NodeSensor(coordinator, device, name, "activity", None, None, "mdi:account-clock"),
+                    NodeSensor(coordinator, device, name, "cpu_percent", "%", float, "mdi:cpu-64-bit"),
+                    NodeSensor(coordinator, device, name, "ram_percent", "%", float, "mdi:memory"),
+                    NodeSensor(coordinator, device, name, "load", None, None, "mdi:speedometer"),
                 ]
             )
         if new:
@@ -57,7 +59,7 @@ class NodeSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
     def __init__(
         self,
         coordinator: LeasshCoordinator,
-        entry: ConfigEntry,
+        device: DeviceInfo,
         node_name: str,
         key: str,
         unit: str | None,
@@ -68,18 +70,14 @@ class NodeSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
         self._node = node_name
         self._key = key
         self._value_type = value_type
-        self._attr_unique_id = f"{entry.entry_id}_{node_name}_{key}"
-        self._attr_device_info = node_device(entry, node_name, self._node_host(coordinator))
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_{node_name}_{key}"
+        self._attr_device_info = device
         self._attr_translation_key = key
         if unit:
             self._attr_native_unit_of_measurement = unit
             self._attr_state_class = SensorStateClass.MEASUREMENT
         if icon:
             self._attr_icon = icon
-
-    @staticmethod
-    def _node_host(coordinator: LeasshCoordinator) -> str | None:
-        return None  # host arrives with first coordinator payload; device updated lazily
 
     def _node_data(self) -> dict[str, Any] | None:
         for node in self.coordinator.data.get("nodes", []):
