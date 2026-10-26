@@ -74,7 +74,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN].setdefault("outage_notifier", None)
     hass.data[DOMAIN][entry.entry_id] = runtime
 
-    await hass.config_entries.async_forward_platforms(entry, PLATFORMS)
+    # async_forward_entry_setups (not async_forward_platforms, which only
+    # exists from 2024.7) — our manifest floor is 2024.6.
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
@@ -122,3 +124,6 @@ class LeasshRuntime:
     async def shutdown(self) -> None:
         if self.ws:
             await self.ws.stop()
+        # Cancels the pending poll timer; without it the next scheduled
+        # refresh outlives the entry (and trips HA's lingering-timer check).
+        await self.coordinator.async_shutdown()

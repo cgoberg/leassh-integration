@@ -39,8 +39,8 @@ async def async_setup_entry(
             new.extend(
                 [
                     NodeSensor(coordinator, entry, name, "activity", None, None, "mdi:account-clock"),
-                    NodeSensor(coordinator, entry, name, "cpu_percent", "%", float, None, "mdi:cpu-64-bit"),
-                    NodeSensor(coordinator, entry, name, "ram_percent", "%", float, None, "mdi:memory"),
+                    NodeSensor(coordinator, entry, name, "cpu_percent", "%", float, "mdi:cpu-64-bit"),
+                    NodeSensor(coordinator, entry, name, "ram_percent", "%", float, "mdi:memory"),
                     NodeSensor(coordinator, entry, name, "load", None, None, "mdi:speedometer"),
                 ]
             )

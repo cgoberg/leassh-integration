@@ -66,11 +66,13 @@ class LeasshConnectedSensor(BinarySensorEntity):
     Connection state is the heartbeat (plan §2): off means no frames from
     the server, which automations alert on. Deliberately NOT a coordinator
     entity — it must report the connection, not the last successful poll.
+    The entity_id is part of the documented contract, so it is pinned via
+    an explicit name rather than derived from device+translation.
     """
 
-    _attr_has_entity_name = True
+    _attr_has_entity_name = False
+    _attr_name = "Leassh connected"
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
-    _attr_translation_key = "connected"
 
     def __init__(self, entry: ConfigEntry, runtime: LeasshRuntime) -> None:
         self._entry = entry
