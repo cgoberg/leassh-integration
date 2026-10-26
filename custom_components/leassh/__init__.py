@@ -58,7 +58,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = LeasshCoordinator(hass, client)
     await coordinator.async_config_entry_first_refresh()
 
-    runtime = LeasshRuntime(client=client, coordinator=coordinator)
+    runtime = LeasshRuntime(hass, client=client, coordinator=coordinator)
     runtime.ws = LeasshWsClient(
         hass,
         client,
@@ -92,14 +92,15 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 class LeasshRuntime:
     """Per-entry shared state: client, coordinator, WS session, notify."""
 
-    def __init__(self, client: LeasshClient, coordinator: LeasshCoordinator) -> None:
+    def __init__(self, hass: HomeAssistant, client: LeasshClient, coordinator: LeasshCoordinator) -> None:
+        self.hass = hass
         self.client = client
         self.coordinator = coordinator
         self.ws: LeasshWsClient | None = None
         self.connected = False
         # Entities (the connected binary sensor) refresh on WS state flips.
         self.ws_callbacks: list = []
-        # Replaced by notify.py during platform setup.
+        # Replaced by notify.py during platform setup (an async callable).
         self.send_notification = None
 
     def set_connected(self, connected: bool) -> None:
@@ -115,10 +116,14 @@ class LeasshRuntime:
                 data.get("title"),
             )
             return
-        self.send_notification(
-            data.get("title", "Leassh"),
-            data.get("body", data.get("message", "")),
-            data,
+        # Called from the WS receive loop; the deliverable is a coroutine —
+        # schedule it, never drop it.
+        self.hass.async_create_task(
+            self.send_notification(
+                data.get("title", "Leassh"),
+                data.get("body", data.get("message", "")),
+                data,
+            )
         )
 
     async def shutdown(self) -> None:

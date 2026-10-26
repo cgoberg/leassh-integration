@@ -34,7 +34,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     runtime: LeasshRuntime = hass.data[DOMAIN][entry.entry_id]
-    entity = LeasshNotifyEntity(entry, runtime)
+    entity = LeasshNotifyEntity(hass, entry, runtime)
     async_add_entities([entity])
     # Wire the two delivery paths to this entity: WS notify events and the
     # WS watchdog's outage push.
@@ -48,7 +48,8 @@ class LeasshNotifyEntity(NotifyEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "notify"
 
-    def __init__(self, entry: ConfigEntry, runtime: LeasshRuntime) -> None:
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, runtime: LeasshRuntime) -> None:
+        self._hass = hass
         self._entry = entry
         self._runtime = runtime
         self._attr_unique_id = f"{entry.entry_id}_notify"
@@ -91,7 +92,7 @@ class LeasshNotifyEntity(NotifyEntity):
             return
 
         for target in targets:
-            await self._entry.hass.services.async_call(
+            await self._hass.services.async_call(
                 "notify",
                 target,
                 service_data,
@@ -104,5 +105,5 @@ class LeasshNotifyEntity(NotifyEntity):
         if configured:
             return list(configured)
         # Default: every mobile_app notify service present in this HA.
-        notify_services = self._entry.hass.services.async_services().get("notify", {})
+        notify_services = self._hass.services.async_services().get("notify", {})
         return sorted(k for k in notify_services if k.startswith("mobile_app_"))
