@@ -1,0 +1,16 @@
+{
+  "domain": "leassh",
+  "name": "Leassh",
+  "codeowners": ["@cgoberg"],
+  "config_flow": true,
+  "dependencies": [],
+  "after_dependencies": ["zeroconf"],
+  "documentation": "https://github.com/cgoberg/leassh-hacs",
+  "integration_type": "hub",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/cgoberg/leassh-hacs/issues",
+  "loggers": ["leassh"],
+  "requirements": [],
+  "version": "0.1.0",
+  "zeroconf": ["_leassh._tcp.local."]
+}

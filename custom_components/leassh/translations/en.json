@@ -1,0 +1,65 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Pair Home Assistant with a Leassh server (server mode). The token is minted on the server in `fleet.yaml` under `api.tokens` (scope `ha`).",
+        "data": {
+          "server_url": "Server URL",
+          "api_token": "API token"
+        }
+      },
+      "zeroconf_confirm": {
+        "description": "Discovered a Leassh server at {server}.",
+        "data": {
+          "api_token": "API token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication"
+    },
+    "abort": {
+      "already_configured": "This Leassh server is already configured",
+      "no_api": "The discovered server is not offering the API"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "notify_targets": "Companion-app notify targets (comma-separated notify service names, e.g. mobile_app_iphone; empty = all mobile_app targets)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "connected": {
+        "name": "Server connection"
+      },
+      "online": {
+        "name": "Online"
+      },
+      "human_present": {
+        "name": "Signed in"
+      }
+    },
+    "sensor": {
+      "activity": { "name": "Activity" },
+      "cpu_percent": { "name": "CPU" },
+      "ram_percent": { "name": "RAM" },
+      "load": { "name": "Load" }
+    },
+    "button": {
+      "action_button": {
+        "name": "{action}"
+      }
+    },
+    "notify": {
+      "notify": {
+        "name": "Leassh"
+      }
+    }
+  }
+}
