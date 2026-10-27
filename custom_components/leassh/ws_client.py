@@ -108,19 +108,15 @@ class LeasshWsClient:
         _LOGGER.info("Leassh WS session up (%s)", self._client.base_url)
         try:
             while not self._stop.is_set():
-                # Staleness check: server pings on a fixed cadence; silence
-                # beyond STALE_AFTER_SECS means the link is dead even if the
-                # socket has not errored yet.
-                since = time.monotonic() - (self.last_frame_monotonic or 0.0)
-                if since > STALE_AFTER_SECS:
-                    raise LeasshConnectionError(
-                        f"no frames for {since:.0f}s (server heartbeat missed)"
-                    )
+                # Liveness is aiohttp's job: heartbeat pings fail the
+                # connection if pongs stop. Ping/pong frames are handled
+                # internally and NEVER surface on receive(), so counting
+                # received frames as liveness misfires between text events
+                # (the 75s metronome bug). receive with a generous timeout
+                # purely to keep the outage watcher running.
                 self._check_outage_alert()
                 try:
-                    msg = await asyncio.wait_for(
-                        ws.receive(), timeout=min(STALE_AFTER_SECS, 15.0)
-                    )
+                    msg = await asyncio.wait_for(ws.receive(), timeout=15.0)
                 except TimeoutError:
                     continue
                 self.last_frame_monotonic = time.monotonic()
