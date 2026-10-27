@@ -1,15 +1,15 @@
 {
   "domain": "leassh",
   "name": "Leassh",
+  "after_dependencies": [
+    "zeroconf"
+  ],
   "codeowners": [
     "@cgoberg"
   ],
   "config_flow": true,
   "dependencies": [
     "http"
-  ],
-  "after_dependencies": [
-    "zeroconf"
   ],
   "documentation": "https://github.com/cgoberg/leassh-integration",
   "integration_type": "hub",
