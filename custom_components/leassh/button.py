@@ -18,7 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from . import LeasshRuntime
 from .api import LeasshApiError
 from .const import DOMAIN
-from .entity import node_device
+from .entity import node_device, title_case
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -95,9 +95,9 @@ class ActionButton(ButtonEntity):
         self._attr_unique_id = f"{self._entry.entry_id}_{node_name}_{verb}"
         self._attr_device_info = device
         self._attr_translation_key = "action_button"
-        self._attr_translation_placeholders = {"action": verb.replace("_node", "").replace("_", " ")}
+        self._attr_translation_placeholders = {"action": title_case(verb)}
         self._attr_icon = _ICON_BY_VERB.get(verb, "mdi:flash")
-        self._attr_name = f"{verb.replace('_', ' ')}"  # shown under the node device
+        self._attr_name = title_case(verb)  # "Sign out session", shown under the node device
 
     async def async_press(self) -> None:
         try:

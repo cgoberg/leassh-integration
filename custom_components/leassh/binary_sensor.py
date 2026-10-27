@@ -10,8 +10,8 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import LeasshRuntime
@@ -50,7 +50,7 @@ async def async_setup_entry(
                     ),
                     NodeBinarySensor(
                         coordinator, device, name, BinarySensorDeviceClass.OCCUPANCY,
-                        "human_present", "human_present",
+                        "signed_in", "human_present",
                     ),
                 ]
             )
@@ -63,18 +63,20 @@ async def async_setup_entry(
 
 
 class LeasshConnectedSensor(BinarySensorEntity):
-    """`binary_sensor.leassh_connected` — the WS heartbeat made visible.
+    """The WS heartbeat made visible: "Leassh Server Connected".
 
     Connection state is the heartbeat (plan §2): off means no frames from
     the server, which automations alert on. Deliberately NOT a coordinator
     entity — it must report the connection, not the last successful poll.
-    The entity_id is part of the documented contract, so it is pinned via
-    an explicit name rather than derived from device+translation.
+    has_entity_name under the "Leassh Server" hub device renders as
+    "Leassh Server Connected" with entity id binary_sensor.leassh_server_connected.
     """
 
-    _attr_has_entity_name = False
-    _attr_name = "Leassh connected"
+    _attr_has_entity_name = True
+    _attr_translation_key = "connected"
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    # Brand: the integration-served logo instead of a generic icon.
+    _attr_entity_picture = "/leassh_static/logo.png"
 
     def __init__(self, entry: ConfigEntry, runtime: LeasshRuntime) -> None:
         self._entry = entry
@@ -94,7 +96,7 @@ class LeasshConnectedSensor(BinarySensorEntity):
 
 
 class NodeBinarySensor(CoordinatorEntity[LeasshCoordinator], BinarySensorEntity):
-    """Per-node binary sensor (online / human_present)."""
+    """Per-node binary sensor (Online / Signed in)."""
 
     def __init__(
         self,

@@ -37,7 +37,7 @@ async def test_full_setup(hass, socket_enabled):
     await hass.async_block_till_done()
 
     # Hub sensor: WS heartbeat may still be ramping; the entity must exist.
-    state = hass.states.get("binary_sensor.leassh_connected")
+    state = hass.states.get("binary_sensor.leassh_server_connected")
     assert state is not None, "connected binary_sensor missing"
 
     # Coordinator fetched the fleet: per-node devices/entities exist.
@@ -52,7 +52,7 @@ async def test_full_setup(hass, socket_enabled):
 
     await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
-    state = hass.states.get("binary_sensor.leassh_connected")
+    state = hass.states.get("binary_sensor.leassh_server_connected")
     assert state is None or state.state == "unavailable"
 
 

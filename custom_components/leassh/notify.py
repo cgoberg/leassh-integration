@@ -47,6 +47,7 @@ class LeasshNotifyEntity(NotifyEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "notify"
+    _attr_entity_picture = "/leassh_static/logo.png"
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, runtime: LeasshRuntime) -> None:
         self._hass = hass

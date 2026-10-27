@@ -36,20 +36,28 @@
   "entity": {
     "binary_sensor": {
       "connected": {
-        "name": "Server connection"
+        "name": "Connected"
       },
       "online": {
         "name": "Online"
       },
-      "human_present": {
+      "signed_in": {
         "name": "Signed in"
       }
     },
     "sensor": {
-      "activity": { "name": "Activity" },
-      "cpu_percent": { "name": "CPU" },
-      "ram_percent": { "name": "RAM" },
-      "load": { "name": "Load" }
+      "activity": {
+        "name": "Activity"
+      },
+      "cpu_percent": {
+        "name": "CPU usage"
+      },
+      "ram_percent": {
+        "name": "RAM usage"
+      },
+      "load": {
+        "name": "Load"
+      }
     },
     "button": {
       "action_button": {

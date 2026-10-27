@@ -11,6 +11,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from pathlib import Path
+
+try:
+    from homeassistant.components.http import StaticPathConfig
+except ImportError:  # HA < 2024.7
+    StaticPathConfig = None
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -36,9 +42,22 @@ PLATFORMS: list[Platform] = [
     Platform.NOTIFY,
 ]
 
+# Brand assets served at /leassh_static (entity_picture on the hub and
+# notify entities; no icon fonts for the brand mark).
+_STATIC_DIR = Path(__file__).parent / "static"
+
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.data.setdefault(DOMAIN, {})
+    if _STATIC_DIR.is_dir() and hass.http is not None:
+        try:
+            # StaticPathConfig arrived ~2024.7; the floor (2024.6) uses
+            # aiohttp's router directly.
+            await hass.http.async_register_static_paths(
+                [StaticPathConfig("/leassh_static", str(_STATIC_DIR), cache_headers=False)]
+            )
+        except (AttributeError, ImportError):
+            hass.http.app.router.add_static("/leassh_static", str(_STATIC_DIR))
     return True
 
 
