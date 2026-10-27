@@ -86,6 +86,10 @@ class LeasshWsClient:
                 self._set_connected(False)
                 return  # permanent: user must fix the token
             except asyncio.CancelledError:
+                # Never die silently: a swallowed cancellation presents as
+                # connection churn with no client-side trace (found live
+                # 2026-10-27 while diagnosing the HA metronome).
+                _LOGGER.warning("WS _run CANCELLED externally")
                 raise
             except Exception as err:  # noqa: BLE001 - reconnect on anything
                 _LOGGER.warning("Leassh WS session ended: %s", err)
