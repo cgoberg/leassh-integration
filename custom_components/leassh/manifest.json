@@ -1,4 +1,6 @@
 {
+  "domain": "leassh",
+  "name": "Leassh",
   "after_dependencies": [
     "zeroconf"
   ],
@@ -10,14 +12,12 @@
     "http"
   ],
   "documentation": "https://github.com/cgoberg/leassh-integration",
-  "domain": "leassh",
   "integration_type": "hub",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/cgoberg/leassh-integration/issues",
   "loggers": [
     "custom_components.leassh"
   ],
-  "name": "Leassh",
   "requirements": [],
   "version": "0.3.2",
   "zeroconf": [
