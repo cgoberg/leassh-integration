@@ -19,7 +19,7 @@
     "custom_components.leassh"
   ],
   "requirements": [],
-  "version": "0.3.2",
+  "version": "0.3.3",
   "zeroconf": [
     "_leassh._tcp.local."
   ]

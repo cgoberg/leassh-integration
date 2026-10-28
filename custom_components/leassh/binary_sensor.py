@@ -17,7 +17,13 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import LeasshRuntime
 from .const import DOMAIN
 from .coordinator import LeasshCoordinator
-from .entity import hub_device, node_device
+from .entity import (
+    entity_unique_id,
+    find_node,
+    hub_device,
+    node_device,
+    node_host,
+)
 
 
 async def async_setup_entry(
@@ -32,28 +38,31 @@ async def async_setup_entry(
         LeasshConnectedSensor(entry, runtime),
     ]
 
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
 
     def add_node_sensors() -> None:
         new: list[BinarySensorEntity] = []
         for node in coordinator.data.get("nodes", []):
-            name = node.get("name")
-            if not name or name in seen:
+            host = node_host(node)
+            if not host:
                 continue
-            seen.add(name)
-            device = node_device(hass, entry, name)
-            new.extend(
-                [
+            device = node_device(hass, entry, node)
+            if device is None:
+                continue
+            for key, device_class, field in (
+                ("online", BinarySensorDeviceClass.CONNECTIVITY, "reachable"),
+                # Deliberately OCCUPANCY for now: the PRESENCE device class
+                # needs a newer HA floor (roadmap M4 open decision).
+                ("signed_in", BinarySensorDeviceClass.OCCUPANCY, "human_present"),
+            ):
+                if (host, key) in seen:
+                    continue
+                seen.add((host, key))
+                new.append(
                     NodeBinarySensor(
-                        coordinator, device, name, BinarySensorDeviceClass.CONNECTIVITY,
-                        "online", "reachable",
-                    ),
-                    NodeBinarySensor(
-                        coordinator, device, name, BinarySensorDeviceClass.OCCUPANCY,
-                        "signed_in", "human_present",
-                    ),
-                ]
-            )
+                        coordinator, entry, host, device, device_class, key, field
+                    )
+                )
         if new:
             async_add_entities(new)
 
@@ -98,28 +107,28 @@ class LeasshConnectedSensor(BinarySensorEntity):
 class NodeBinarySensor(CoordinatorEntity[LeasshCoordinator], BinarySensorEntity):
     """Per-node binary sensor (Online / Signed in)."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: LeasshCoordinator,
+        entry: ConfigEntry,
+        host: str,
         device: DeviceInfo,
-        node_name: str,
         device_class: BinarySensorDeviceClass,
         key: str,
         field: str,
     ) -> None:
         super().__init__(coordinator)
-        self._node = node_name
+        self._host = host
         self._field = field
         self._attr_device_class = device_class
         self._attr_translation_key = key
-        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_{node_name}_{key}"
+        self._attr_unique_id = entity_unique_id(entry, host, key)
         self._attr_device_info = device
 
     def _node_data(self) -> dict[str, Any] | None:
-        for node in self.coordinator.data.get("nodes", []):
-            if node.get("name") == self._node:
-                return node
-        return None
+        return find_node(self.coordinator, self._host)
 
     @property
     def available(self) -> bool:

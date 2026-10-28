@@ -22,6 +22,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import LeasshRuntime
 from .const import CONF_NOTIFY_TARGETS, DOMAIN
+from .entity import hub_device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ class LeasshNotifyEntity(NotifyEntity):
         self._entry = entry
         self._runtime = runtime
         self._attr_unique_id = f"{entry.entry_id}_notify"
+        self._attr_device_info = hub_device(entry, runtime.client.base_url)
 
     async def async_send_message(self, message: str, **kwargs: Any) -> None:
         await self.async_deliver(

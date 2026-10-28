@@ -74,7 +74,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except LeasshConnectionError as err:
         raise ConfigEntryNotReady(f"Leassh unreachable: {err}") from err
 
-    coordinator = LeasshCoordinator(hass, client)
+    coordinator = LeasshCoordinator(hass, client, entry)
     await coordinator.async_config_entry_first_refresh()
 
     runtime = LeasshRuntime(hass, client=client, coordinator=coordinator)

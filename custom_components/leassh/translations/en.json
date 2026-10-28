@@ -13,6 +13,19 @@
         "data": {
           "api_token": "API token"
         }
+      },
+      "reauth_confirm": {
+        "description": "The Leassh server rejected the stored token. Enter a fresh token minted for the `ha` scope.",
+        "data": {
+          "api_token": "API token"
+        }
+      },
+      "reconfigure": {
+        "description": "Change the Leassh server URL or token. The config entry is kept.",
+        "data": {
+          "server_url": "Server URL",
+          "api_token": "API token"
+        }
       }
     },
     "error": {
@@ -21,7 +34,9 @@
     },
     "abort": {
       "already_configured": "This Leassh server is already configured",
-      "no_api": "The discovered server is not offering the API"
+      "no_api": "The discovered server is not offering the API",
+      "reauth_successful": "Re-authentication was successful",
+      "reconfigure_successful": "Reconfiguration was successful"
     }
   },
   "options": {
@@ -47,21 +62,67 @@
     },
     "sensor": {
       "activity": {
-        "name": "Activity"
+        "name": "Activity",
+        "state": {
+          "active": "Active",
+          "away": "Away",
+          "idle": "Idle",
+          "offline": "Offline"
+        }
       },
-      "cpu_percent": {
+      "cpu_usage": {
         "name": "CPU usage"
       },
       "ram_percent": {
         "name": "RAM usage"
       },
+      "ram_used": {
+        "name": "RAM used"
+      },
+      "ram_total": {
+        "name": "RAM total"
+      },
+      "disk_free": {
+        "name": "Disk free"
+      },
+      "gpu_usage": {
+        "name": "GPU usage"
+      },
+      "gpu_temperature": {
+        "name": "GPU temperature"
+      },
+      "cpu_temperature": {
+        "name": "CPU temperature"
+      },
+      "vram_used": {
+        "name": "VRAM used"
+      },
+      "vram_total": {
+        "name": "VRAM total"
+      },
+      "idle": {
+        "name": "Idle time"
+      },
+      "presence_idle": {
+        "name": "Presence idle time"
+      },
       "load": {
-        "name": "Load"
+        "name": "Load",
+        "state": {
+          "none": "None",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "unknown": "Unknown"
+        }
       }
     },
     "button": {
-      "action_button": {
-        "name": "{action}"
+      "reboot_node": {
+        "name": "Reboot"
+      },
+      "sign_out_session": {
+        "name": "Sign out session"
       }
     },
     "notify": {
