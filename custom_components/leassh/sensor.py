@@ -159,9 +159,13 @@ async def async_setup_entry(
     coordinator = runtime.coordinator
 
     seen: set[str] = set()
+    # Dynamic identities are allowed to come back after a genuine removal
+    # (a GPU pulled and re-seated). Fixed identities never disappear.
+    dynamic_seen: set = set()
 
     def add_node_sensors() -> None:
         new: list[SensorEntity] = []
+        current_dynamic: set = set()
         for node in coordinator.data.get("nodes", []):
             host = node_host(node)
             if not host:
@@ -177,7 +181,18 @@ async def async_setup_entry(
                 new.append(NodeSensor(coordinator, entry, host, device, description))
             # Generic scalar metrics and series arrive in M2. They are built
             # from the API's own metadata so a pack file is the whole change.
-            new.extend(_generic_entities(coordinator, entry, host, device, node, seen))
+            new.extend(
+                _generic_entities(
+                    coordinator,
+                    entry,
+                    host,
+                    device,
+                    node,
+                    dynamic_seen,
+                    current_dynamic,
+                )
+            )
+        dynamic_seen.intersection_update(current_dynamic)
         if new:
             async_add_entities(new)
 
@@ -192,6 +207,7 @@ def _generic_entities(
     device: DeviceInfo,
     node: dict,
     seen: set,
+    current: set,
 ) -> list[SensorEntity]:
     """Scalars from `metrics` and instances from `series`.
 
@@ -204,6 +220,7 @@ def _generic_entities(
         if not isinstance(metric, dict):
             continue
         identity = (host, metric_id, None)
+        current.add(identity)
         if identity in seen:
             continue
         seen.add(identity)
@@ -234,6 +251,7 @@ def _generic_entities(
             label = instance.get("label")
             for field, value in (instance.get("values") or {}).items():
                 identity = (host, f"{series_id}_{key}_{field}", key)
+                current.add(identity)
                 if identity in seen:
                     continue
                 seen.add(identity)

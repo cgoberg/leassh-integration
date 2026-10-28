@@ -40,6 +40,24 @@ async def async_get_config_entry_diagnostics(
             "etag": redact(runtime.coordinator._etag or ""),
             "nodes": len((runtime.coordinator.data or {}).get("nodes", [])),
         },
+        # Keys, not values: enough to prove a pack's telemetry arrived without
+        # turning a support download into a window-title dump.
+        "telemetry": [
+            {
+                "name": node.get("name"),
+                "host": node.get("host"),
+                "metrics": sorted((node.get("metrics") or {}).keys()),
+                "series": {
+                    series_id: [
+                        str(instance.get("key") or instance.get("index"))
+                        for instance in instances or []
+                    ]
+                    for series_id, instances in (node.get("series") or {}).items()
+                },
+            }
+            for node in (runtime.coordinator.data or {}).get("nodes", [])
+            if isinstance(node, dict)
+        ],
         "entry": {
             "title": entry.title,
             "options": dict(entry.options),
