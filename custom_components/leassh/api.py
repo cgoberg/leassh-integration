@@ -7,6 +7,7 @@ ETag caching; commands, events and presence ride the WS session.
 
 from __future__ import annotations
 
+import json as jsonlib
 import logging
 from typing import Any
 
@@ -31,6 +32,14 @@ class LeasshAuthError(LeasshError):
 
 class LeasshApiError(LeasshError):
     """Server refused a request (4xx/5xx body carried in message)."""
+
+
+class LeasshLicenseError(LeasshError):
+    """Server rejected the license (503 + {"error": "license invalid"})."""
+
+    def __init__(self, message: str, tier: str | None = None) -> None:
+        super().__init__(message)
+        self.tier = tier
 
 
 class LeasshClient:
@@ -88,6 +97,20 @@ class LeasshClient:
         if resp.status in (401, 403):
             await resp.release()
             raise LeasshAuthError(f"token rejected ({resp.status})")
+        if resp.status == 503:
+            body = await resp.text()
+            await resp.release()
+            # The server's license contract: 503 + {"error":"license invalid"}.
+            # Never report this as "cannot connect" — the network is fine.
+            if "license invalid" in body.lower() or "license" in body.lower():
+                try:
+                    payload = jsonlib.loads(body)
+                except ValueError:
+                    payload = {}
+                raise LeasshLicenseError(
+                    payload.get("error") or "license invalid",
+                    tier=payload.get("tier"),
+                )
         return resp
 
     async def health(self) -> dict[str, Any]:

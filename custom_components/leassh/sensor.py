@@ -205,7 +205,10 @@ async def async_setup_entry(
 
     add_node_sensors()
     entry.async_on_unload(coordinator.async_add_listener(add_node_sensors))
-    async_add_entities([LeasshPackSuggestionsSensor(entry, runtime)])
+    async_add_entities([
+        LeasshPackSuggestionsSensor(entry, runtime),
+        LeasshLicenseSensor(entry, runtime),
+    ])
 
 
 def _generic_entities(
@@ -577,3 +580,41 @@ class LeasshPackSuggestionsSensor(CoordinatorEntity[LeasshCoordinator], SensorEn
     @property
     def available(self) -> bool:
         return self.coordinator.last_update_success
+
+class LeasshLicenseSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
+    """License tier for the hub, with the limit/expiry as attributes."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "license"
+    _attr_icon = "mdi:license"
+
+    def __init__(self, entry: ConfigEntry, runtime: LeasshRuntime) -> None:
+        super().__init__(runtime.coordinator)
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_license"
+        self._attr_device_info = hub_device(entry, runtime.client.base_url)
+
+    @property
+    def native_value(self) -> str:
+        license_info = (self.coordinator.health or {}).get("license") or {}
+        tier = license_info.get("tier")
+        return str(tier) if tier else "unknown"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        health = self.coordinator.health or {}
+        license_info = health.get("license") or {}
+        return {
+            "valid": license_info.get("valid"),
+            "max_nodes": license_info.get("max_nodes"),
+            "nodes_current": (license_info.get("node_limit") or {}).get("current"),
+            "node_limit_exceeded": (license_info.get("node_limit") or {}).get("exceeded"),
+            "expires_at": license_info.get("expires_at"),
+            "degraded": health.get("degraded"),
+            "upgrade_url": "https://leassh.com/pricing",
+        }
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success
+

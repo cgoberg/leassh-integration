@@ -30,7 +30,8 @@
     },
     "error": {
       "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid authentication"
+      "invalid_auth": "Invalid authentication",
+      "license_invalid": "Leassh server rejected the license. Update the license key in the add-on or fleet.yaml, then reload."
     },
     "abort": {
       "already_configured": "This Leassh server is already configured",
@@ -121,6 +122,16 @@
       },
       "suggested_packs": {
         "name": "Suggested packs"
+      },
+      "license": {
+        "name": "License",
+        "state": {
+          "free": "Free",
+          "family": "Family",
+          "pro": "Pro",
+          "unlimited": "Unlimited",
+          "unknown": "Unknown"
+        }
       }
     },
     "button": {
@@ -139,46 +150,44 @@
   },
   "issues": {
     "license_invalid": {
-      "title": "Leassh licence invalid",
+      "title": "Leassh license invalid",
       "fix_flow": {
-        "step": {
-          "init": {
-            "title": "Repair Leassh",
-            "menu_options": {
-              "retry": "Re-run the probe",
-              "disable_pack": "Disable this pack"
-            }
-          },
-          "retry": {
-            "title": "Re-running",
-            "description": "Re-running the pack pipeline and refreshing state."
-          },
-          "disable_pack": {
-            "title": "Disabling pack",
-            "description": "The pack will not be selected until it is re-enabled or the server restarts."
+        "init": {
+          "title": "Repair Leassh license",
+          "description": "Choose **Re-authenticate** to paste a fresh key, or **Upgrade** to open https://leassh.com/pricing.",
+          "menu_options": {
+            "reauth": "Re-authenticate with a new license key",
+            "upgrade": "Open upgrade page (leassh.com/pricing)"
           }
+        },
+        "reauth": {
+          "title": "Re-authenticate",
+          "description": "Home Assistant will open the reauthentication flow. Update `license_token` in the add-on or `fleet.yaml` first if you have a new key."
+        },
+        "upgrade": {
+          "title": "Upgrade",
+          "description": "Open https://leassh.com/pricing in a browser, then update the license key."
         }
       }
     },
     "license_expiring": {
-      "title": "Leassh licence expires soon",
+      "title": "Leassh license expires in {days} day(s)",
       "fix_flow": {
-        "step": {
-          "init": {
-            "title": "Repair Leassh",
-            "menu_options": {
-              "retry": "Re-run the probe",
-              "disable_pack": "Disable this pack"
-            }
-          },
-          "retry": {
-            "title": "Re-running",
-            "description": "Re-running the pack pipeline and refreshing state."
-          },
-          "disable_pack": {
-            "title": "Disabling pack",
-            "description": "The pack will not be selected until it is re-enabled or the server restarts."
+        "init": {
+          "title": "Repair Leassh license",
+          "description": "Renew or upgrade at https://leassh.com/account or https://leassh.com/pricing. The license expires in {days} day(s).",
+          "menu_options": {
+            "reauth": "Re-authenticate with a new license key",
+            "upgrade": "Open upgrade page (leassh.com/pricing)"
           }
+        },
+        "reauth": {
+          "title": "Re-authenticate",
+          "description": "Home Assistant will open the reauthentication flow."
+        },
+        "upgrade": {
+          "title": "Upgrade",
+          "description": "Open https://leassh.com/pricing in a browser."
         }
       }
     },
@@ -223,6 +232,27 @@
             "title": "Disabling pack",
             "description": "The pack will not be selected until it is re-enabled or the server restarts."
           }
+        }
+      }
+    },
+    "node_limit_reached": {
+      "title": "Leassh node limit reached ({current}/{max})",
+      "fix_flow": {
+        "init": {
+          "title": "Leassh node limit reached",
+          "description": "This {tier} license allows {max} nodes and the fleet has {current}. Existing nodes keep reporting; new nodes are blocked. Remove a node or upgrade at {upgrade_url}.",
+          "menu_options": {
+            "reauth": "Re-authenticate with a new license key",
+            "upgrade": "Open upgrade page (leassh.com/pricing)"
+          }
+        },
+        "reauth": {
+          "title": "Re-authenticate",
+          "description": "Home Assistant will open the reauthentication flow."
+        },
+        "upgrade": {
+          "title": "Upgrade",
+          "description": "Open https://leassh.com/pricing in a browser."
         }
       }
     }

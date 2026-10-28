@@ -124,3 +124,27 @@ async def test_reconfigure_changes_url_and_keeps_the_entry(hass) -> None:
     assert entry.data[CONF_SERVER_URL] == "http://192.168.1.200:8790"
     assert entry.unique_id == "192.168.1.200:8790"
     assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+
+
+async def test_user_flow_reports_license_invalid_not_cannot_connect(hass) -> None:
+    from custom_components.leassh.api import LeasshLicenseError
+
+    async def reject_license(self, etag=None):
+        raise LeasshLicenseError("license invalid", tier="free")
+
+    with patch(
+        "custom_components.leassh.api.LeasshClient.get_devices",
+        new=reject_license,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_SERVER_URL: "http://192.168.1.127:8790",
+                CONF_API_TOKEN: "ha-token",
+            },
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["errors"] == {"base": "license_invalid"}

@@ -83,3 +83,36 @@ async def test_telemetry_degraded_needs_three_cycles(hass) -> None:
         )
         is not None
     )
+
+
+async def test_node_limit_creates_repair_and_clears_when_fixed(hass) -> None:
+    health = {
+        "license": {
+            "valid": True,
+            "tier": "free",
+            "max_nodes": 2,
+            "node_limit": {"current": 3, "max": 2, "exceeded": True},
+            "expires_at": None,
+        },
+        "degraded": True,
+    }
+    _check_license(hass, health)
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, "node_limit_reached")
+    assert issue is not None
+    assert issue.is_fixable is True
+    assert issue.severity == ir.IssueSeverity.WARNING
+
+    _check_license(
+        hass,
+        {
+            "license": {
+                "valid": True,
+                "tier": "free",
+                "max_nodes": 2,
+                "node_limit": {"current": 2, "max": 2, "exceeded": False},
+                "expires_at": None,
+            },
+            "degraded": False,
+        },
+    )
+    assert ir.async_get(hass).async_get_issue(DOMAIN, "node_limit_reached") is None

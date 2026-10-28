@@ -24,6 +24,7 @@ from .api import (
     LeasshAuthError,
     LeasshClient,
     LeasshConnectionError,
+    LeasshLicenseError,
     normalize_server_url,
 )
 from .const import CONF_API_TOKEN, CONF_NOTIFY_TARGETS, CONF_SERVER_URL, DEFAULT_PORT, DOMAIN
@@ -63,6 +64,8 @@ class LeasshConfigFlow(ConfigFlow, domain=DOMAIN):
                 await client.get_devices()
             except LeasshAuthError:
                 errors["base"] = "invalid_auth"
+            except LeasshLicenseError:
+                errors["base"] = "license_invalid"
             except LeasshConnectionError:  # noqa: PERF203 - one by design
                 errors["base"] = "cannot_connect"
             except Exception:  # noqa: BLE001 - surface as cannot_connect
@@ -139,6 +142,8 @@ class LeasshConfigFlow(ConfigFlow, domain=DOMAIN):
                 await client.get_devices()
             except LeasshAuthError:
                 errors["base"] = "invalid_auth"
+            except LeasshLicenseError:
+                errors["base"] = "license_invalid"
             except LeasshConnectionError:
                 errors["base"] = "cannot_connect"
             else:
@@ -169,6 +174,8 @@ class LeasshConfigFlow(ConfigFlow, domain=DOMAIN):
                 await client.get_devices()
             except LeasshAuthError:
                 errors["base"] = "invalid_auth"
+            except LeasshLicenseError:
+                errors["base"] = "license_invalid"
             except LeasshConnectionError:
                 errors["base"] = "cannot_connect"
             else:

@@ -41,9 +41,37 @@ def _check_license(hass: HomeAssistant, health: dict) -> None:
             is_persistent=True,
             severity=ir.IssueSeverity.ERROR,
             translation_key="license_invalid",
+            translation_placeholders={"upgrade_url": "https://leassh.com/pricing"},
+            data={"upgrade_url": "https://leassh.com/pricing"},
         )
-        return
-    ir.async_delete_issue(hass, DOMAIN, issue_id)
+    else:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+
+    # Node limit is a distinct, non-crashing state: existing nodes keep
+    # reporting, new nodes are refused, and the fix is remove-or-upgrade.
+    limit = license_info.get("node_limit") or {}
+    over = bool(limit.get("exceeded")) or bool(health.get("degraded"))
+    if over:
+        current = limit.get("current", (health.get("nodes") or {}).get("unique", "?"))
+        maximum = limit.get("max", license_info.get("max_nodes", "?"))
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            "node_limit_reached",
+            is_fixable=True,
+            is_persistent=True,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="node_limit_reached",
+            translation_placeholders={
+                "current": str(current),
+                "max": str(maximum),
+                "tier": str(license_info.get("tier", "current")),
+                "upgrade_url": "https://leassh.com/pricing",
+            },
+            data={"upgrade_url": "https://leassh.com/pricing"},
+        )
+    else:
+        ir.async_delete_issue(hass, DOMAIN, "node_limit_reached")
 
     expires = license_info.get("expires_at")
     if not expires:
@@ -62,7 +90,12 @@ def _check_license(hass: HomeAssistant, health: dict) -> None:
             is_persistent=True,
             severity=ir.IssueSeverity.WARNING,
             translation_key="license_expiring",
-            translation_placeholders={"days": str(max(remaining.days, 0))},
+            translation_placeholders={
+                "days": str(max(remaining.days, 0)),
+                "upgrade_url": "https://leassh.com/pricing",
+                "account_url": "https://leassh.com/account",
+            },
+            data={"upgrade_url": "https://leassh.com/pricing"},
         )
     else:
         ir.async_delete_issue(hass, DOMAIN, "license_expiring")
@@ -137,13 +170,30 @@ async def async_create_fix_flow(
 
 
 class LeasshRepairFlow(RepairsFlow):
-    """Menu: re-run the pipeline, or disable the pack that is breaking."""
+    """License issues get reauth/upgrade; pack issues keep retry/disable."""
 
     def __init__(self, issue_id: str, data: dict) -> None:
         self.issue_id = issue_id
         self.data = data
 
+    def _license_issue(self) -> bool:
+        return self.issue_id in {
+            "license_invalid",
+            "license_expiring",
+            "node_limit_reached",
+        }
+
     async def async_step_init(self, user_input=None):
+        if self._license_issue():
+            options = ["reauth", "upgrade"]
+            return self.async_show_menu(
+                step_id="init",
+                menu_options=options,
+                description_placeholders={
+                    "upgrade_url": "https://leassh.com/pricing",
+                    "account_url": "https://leassh.com/account",
+                },
+            )
         if self.issue_id.startswith("pack_parse_"):
             return self.async_show_menu(
                 step_id="init",
@@ -163,6 +213,26 @@ class LeasshRepairFlow(RepairsFlow):
             if hasattr(runtime, "client"):
                 return runtime
         return None
+
+    async def _entry(self):
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            if self.hass.data.get(DOMAIN, {}).get(entry.entry_id) is not None:
+                return entry
+        entries = self.hass.config_entries.async_entries(DOMAIN)
+        return entries[0] if entries else None
+
+    async def async_step_reauth(self, user_input=None):
+        """Start HA's reauth flow so the user can paste a fresh license key."""
+        entry = await self._entry()
+        if entry is not None:
+            entry.async_start_reauth(self.hass)
+        ir.async_delete_issue(self.hass, DOMAIN, self.issue_id)
+        return self.async_create_entry(title="", data={})
+
+    async def async_step_upgrade(self, user_input=None):
+        """No in-app purchase: the description carries the upgrade URL."""
+        ir.async_delete_issue(self.hass, DOMAIN, self.issue_id)
+        return self.async_create_entry(title="", data={})
 
     async def async_step_retry(self, user_input=None):
         runtime = await self._runtime()

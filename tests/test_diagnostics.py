@@ -23,7 +23,10 @@ async def test_diagnostics_redacts_token(hass) -> None:
         connected=True,
         ws=SimpleNamespace(last_frame_monotonic=None),
         coordinator=SimpleNamespace(
-            last_update_success=True, _etag="abcdef0123456789", data={"nodes": [1, 2]}
+            last_update_success=True, _etag="abcdef0123456789", data={"nodes": [1, 2]},
+            health={"license": {"valid": True, "tier": "free", "max_nodes": 2,
+                                "node_limit": {"current": 1, "max": 2, "exceeded": False},
+                                "expires_at": None}, "degraded": False},
         ),
     )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = runtime
@@ -34,3 +37,6 @@ async def test_diagnostics_redacts_token(hass) -> None:
     assert result["api_token"] == "**REDACTED**"
     assert result["server_url"] == "http://127.0.0.1:8790"
     assert result["coordinator"]["nodes"] == 2
+    assert result["license"]["tier"] == "free"
+    assert result["license"]["max_nodes"] == 2
+    assert "super-secret-token" not in repr(result)

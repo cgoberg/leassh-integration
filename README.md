@@ -30,6 +30,14 @@ scope (`ha`) only ever sees a curated action catalog.
 
 - A Leassh server ≥ 0.2.0 with the API enabled (see below).
 - Home Assistant ≥ 2025.1.
+- A Leassh license. **Home Assistant is included on every plan, including
+  Free.** Free covers 2 computers and one `ha` API token; Family covers 10,
+  Pro 25, Unlimited is contact-only. Get a Free key at
+  <https://leassh.com/setup>.
+
+The add-on accepts online `LSH-…` keys and offline `LSH1.…` tokens. Using
+Home Assistant and OpenClaw at the same time requires Family or Pro because
+Free carries exactly one API token.
 
 ## Server setup (minting the token)
 
@@ -110,6 +118,25 @@ automation:
 Event kinds: `node.online`, `node.offline`, `node.activity`,
 `trigger.<name>`, `notify`, `action.executed`, `action.failed`. Payload
 lives in `event.data.data`.
+
+## License errors and repairs
+
+The integration distinguishes a license refusal from a network failure.
+When the server returns HTTP 503 with `{"error":"license invalid"}`, the
+config flow shows `license_invalid` and the repair `license_invalid` offers
+**Re-authenticate** (paste a fresh key in the add-on or `fleet.yaml`) and
+**Upgrade**. It does not suggest disabling a pack.
+
+Other repairs:
+
+- `license_expiring` — renew at <https://leassh.com/account> or upgrade.
+- `node_limit_reached` — the fleet is over the plan's node count. Existing
+  nodes keep reporting in degraded mode; new nodes are refused with
+  `NODE_LIMIT_REACHED`. Remove a node or upgrade.
+
+Diagnostics include the license tier, max nodes, current node count, expiry,
+and degraded state. A `sensor.leassh_server_license` hub sensor exposes the
+same values. Tokens are still redacted.
 
 ## Security model
 

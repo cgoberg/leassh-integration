@@ -27,6 +27,15 @@ async def async_get_config_entry_diagnostics(
     return {
         "server_url": runtime.client.base_url,
         "api_token": "**REDACTED**",
+        "license": {
+            "valid": (runtime.coordinator.health or {}).get("license", {}).get("valid"),
+            "tier": (runtime.coordinator.health or {}).get("license", {}).get("tier"),
+            "max_nodes": (runtime.coordinator.health or {}).get("license", {}).get("max_nodes"),
+            "nodes_current": (runtime.coordinator.health or {}).get("license", {}).get("node_limit", {}).get("current"),
+            "node_limit_exceeded": (runtime.coordinator.health or {}).get("license", {}).get("node_limit", {}).get("exceeded"),
+            "expires_at": (runtime.coordinator.health or {}).get("license", {}).get("expires_at"),
+            "degraded": (runtime.coordinator.health or {}).get("degraded"),
+        },
         "connection": {
             "connected": runtime.connected,
             "last_frame_age_s": (
