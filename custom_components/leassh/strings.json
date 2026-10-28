@@ -137,7 +137,6 @@
   "issues": {
     "license_invalid": {
       "title": "Leassh licence invalid",
-      "description": "The server is running with an invalid licence. Enforcement and authenticated endpoints are refused until it is restored.",
       "fix_flow": {
         "step": {
           "init": {
@@ -160,7 +159,6 @@
     },
     "license_expiring": {
       "title": "Leassh licence expires soon",
-      "description": "The licence expires in {days} day(s). Renew it to keep enforcement active.",
       "fix_flow": {
         "step": {
           "init": {
@@ -183,7 +181,6 @@
     },
     "pack_parse_failure": {
       "title": "Pack {pack} is failing to parse",
-      "description": "Entry {entry} could not parse its command output: {error}. Re-run the probe, or disable the pack until it is fixed.",
       "fix_flow": {
         "step": {
           "init": {
@@ -206,7 +203,6 @@
     },
     "telemetry_degraded": {
       "title": "Telemetry degraded on {node}",
-      "description": "{node} has been reachable but missing core telemetry for {cycles} cycles. Re-run the probe after checking the host.",
       "fix_flow": {
         "step": {
           "init": {
