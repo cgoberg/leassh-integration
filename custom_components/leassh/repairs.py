@@ -185,7 +185,12 @@ class LeasshRepairFlow(RepairsFlow):
 
     async def async_step_init(self, user_input=None):
         if self._license_issue():
-            options = ["reauth", "upgrade"]
+            if self.issue_id == "license_invalid":
+                options = ["update_license", "upgrade"]
+            elif self.issue_id == "license_expiring":
+                options = ["renew", "upgrade"]
+            else:
+                options = ["remove_node", "upgrade"]
             return self.async_show_menu(
                 step_id="init",
                 menu_options=options,
@@ -221,13 +226,31 @@ class LeasshRepairFlow(RepairsFlow):
         entries = self.hass.config_entries.async_entries(DOMAIN)
         return entries[0] if entries else None
 
-    async def async_step_reauth(self, user_input=None):
-        """Start HA's reauth flow so the user can paste a fresh license key."""
-        entry = await self._entry()
-        if entry is not None:
-            entry.async_start_reauth(self.hass)
+    async def _refresh_and_finish(self):
+        runtime = await self._runtime()
+        if runtime is not None:
+            await runtime.coordinator.async_refresh()
         ir.async_delete_issue(self.hass, DOMAIN, self.issue_id)
         return self.async_create_entry(title="", data={})
+
+    async def async_step_update_license(self, user_input=None):
+        """The license key lives in the add-on/fleet.yaml, not in HA."""
+        if user_input is not None:
+            return await self._refresh_and_finish()
+        return self.async_show_form(
+            step_id="update_license",
+            description_placeholders={
+                "addon_hint": "Settings → Add-ons → Leassh → Configuration → license_token",
+                "yaml_hint": "license_key in fleet.yaml",
+                "upgrade_url": "https://leassh.com/pricing",
+            },
+        )
+
+    async def async_step_renew(self, user_input=None):
+        return await self._refresh_and_finish()
+
+    async def async_step_remove_node(self, user_input=None):
+        return await self._refresh_and_finish()
 
     async def async_step_upgrade(self, user_input=None):
         """No in-app purchase: the description carries the upgrade URL."""

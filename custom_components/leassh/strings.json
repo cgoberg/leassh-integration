@@ -155,15 +155,15 @@
         "step": {
           "init": {
             "title": "Repair Leassh license",
-            "description": "Choose **Re-authenticate** to paste a fresh key, or **Upgrade** to open https://leassh.com/pricing.",
+            "description": "Update `license_token` in the add-on or `license_key` in `fleet.yaml`, then re-check. Choose **Update license** or **Upgrade**.",
             "menu_options": {
-              "reauth": "Re-authenticate with a new license key",
+              "update_license": "Update the license key",
               "upgrade": "Open upgrade page (leassh.com/pricing)"
             }
           },
-          "reauth": {
-            "title": "Re-authenticate",
-            "description": "Home Assistant will open the reauthentication flow. Update `license_token` in the add-on or `fleet.yaml` first if you have a new key."
+          "update_license": {
+            "title": "Update the license key",
+            "description": "In Home Assistant: Settings → Add-ons → Leassh → Configuration → `license_token`. In a manual server: `license_key` in `fleet.yaml`. Restart the Leassh server, then submit to re-check. Free keys start with LSH-; offline paid tokens start with LSH1."
           },
           "upgrade": {
             "title": "Upgrade",
@@ -178,15 +178,15 @@
         "step": {
           "init": {
             "title": "Repair Leassh license",
-            "description": "Renew or upgrade at https://leassh.com/account or https://leassh.com/pricing. The license expires in {days} day(s).",
+            "description": "Renew at https://leassh.com/account or upgrade at https://leassh.com/pricing. The license expires in {days} day(s).",
             "menu_options": {
-              "reauth": "Re-authenticate with a new license key",
+              "renew": "Renew or view billing",
               "upgrade": "Open upgrade page (leassh.com/pricing)"
             }
           },
-          "reauth": {
-            "title": "Re-authenticate",
-            "description": "Home Assistant will open the reauthentication flow."
+          "renew": {
+            "title": "Renew",
+            "description": "Open https://leassh.com/account, enter your pairing code, and use Manage billing. Then submit to re-check."
           },
           "upgrade": {
             "title": "Upgrade",
@@ -247,13 +247,13 @@
             "title": "Leassh node limit reached",
             "description": "This {tier} license allows {max} nodes and the fleet has {current}. Existing nodes keep reporting; new nodes are blocked. Remove a node or upgrade at {upgrade_url}.",
             "menu_options": {
-              "reauth": "Re-authenticate with a new license key",
+              "remove_node": "Remove a node and re-check",
               "upgrade": "Open upgrade page (leassh.com/pricing)"
             }
           },
-          "reauth": {
-            "title": "Re-authenticate",
-            "description": "Home Assistant will open the reauthentication flow."
+          "remove_node": {
+            "title": "Remove a node",
+            "description": "Remove a computer from the add-on nodes list or `fleet.yaml`, restart Leassh, then submit to re-check."
           },
           "upgrade": {
             "title": "Upgrade",
