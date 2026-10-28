@@ -1,14 +1,18 @@
-# Home Assistant integration quality scale (roadmap M2.8).
+# Home Assistant integration quality scale — current rule set (54 rules).
 #
-# Bronze is complete; silver rules are marked done where the integration
-# already satisfies them. `todo` items are explicit, not silently claimed.
+# Source: developers.home-assistant.io/core/quality-scale (checked 2026-10-28).
+# A tier needs every rule of that tier and every tier below it. `exempt` is
+# used only where the rule cannot apply; `todo` is an explicit gap.
 rules:
-  # --- Bronze -----------------------------------------------------------
+  # --- Bronze (20) ------------------------------------------------------
   action-setup:
-    status: done
+    status: exempt
+    comment: No custom actions are registered; notify.leassh is an entity service.
   appropriate-polling:
     status: done
   brands:
+    status: done
+  common-modules:
     status: done
   config-flow:
     status: done
@@ -16,21 +20,32 @@ rules:
     status: done
   dependency-transparency:
     status: done
+    comment: No runtime PyPI dependencies; aiohttp comes from HA.
   docs-actions:
     status: exempt
-    comment: The integration exposes curated server actions as buttons; there are no custom services beyond notify.
-  easy-fix-for-configuration-mistakes:
+    comment: No custom actions beyond the notify entity, which is documented.
+  docs-conditions:
+    status: exempt
+    comment: The integration exposes no conditions.
+  docs-high-level-description:
     status: done
-  entity-device-class:
+  docs-installation-instructions:
     status: done
-  entity-translations:
-    status: done
+  docs-removal-instructions:
+    status: todo
+  docs-triggers:
+    status: exempt
+    comment: No device triggers; leassh_event is documented for automations.
+  entity-event-setup:
+    status: exempt
+    comment: Entities are CoordinatorEntity instances; the entry owns one listener and unloads it with the entry.
   entity-unique-id:
     status: done
   has-entity-name:
     status: done
   runtime-data:
-    status: done
+    status: todo
+    comment: Runtime is in hass.data[DOMAIN][entry_id]; move to ConfigEntry.runtime_data.
   test-before-configure:
     status: done
   test-before-setup:
@@ -38,54 +53,92 @@ rules:
   unique-config-entry:
     status: done
 
-  # --- Silver -----------------------------------------------------------
+  # --- Silver (10) ------------------------------------------------------
   action-exceptions:
-    status: done
+    status: todo
+    comment: Button failures re-raise LeasshApiError; wrap in HomeAssistantError with a translation key.
   config-entry-unloading:
     status: done
+  docs-configuration-parameters:
+    status: todo
+    comment: Document the notify_targets option flow.
+  docs-installation-parameters:
+    status: done
   entity-unavailable:
+    status: done
+  integration-owner:
     status: done
   log-when-unavailable:
     status: done
   parallel-updates:
-    status: done
+    status: todo
+    comment: Set PARALLEL_UPDATES explicitly on each platform.
   reauthentication-flow:
     status: done
-  reconfiguration-flow:
-    status: done
-  stale-devices:
-    status: done
-  entity-category:
+  test-coverage:
     status: todo
-  entity-disabled-by-default:
-    status: todo
-  integration-owner:
+    comment: No 95% coverage gate yet; add pytest-cov and close gaps.
+
+  # --- Gold (21) --------------------------------------------------------
+  devices:
+    status: done
+  diagnostics:
     status: done
   discovery:
     status: done
+    comment: _leassh._tcp zeroconf discovery exists.
   discovery-update-info:
     status: todo
+    comment: A re-discovered server should update the existing entry's URL/host instead of only aborting.
   docs-data-update:
     status: todo
+    comment: Document the 30 s poll plus WS events and their reconciliation.
   docs-examples:
-    status: todo
+    status: done
   docs-known-limitations:
     status: todo
+    comment: Sampler identity limitation, Windows presence caveats, no per-container child devices.
   docs-supported-devices:
     status: todo
+    comment: SSH-reachable Linux/Windows/macOS hosts and the tool prerequisites per pack.
   docs-supported-functions:
     status: todo
+    comment: Entity list, series/per-GPU behaviour, actions, notify, events.
   docs-troubleshooting:
     status: todo
+    comment: Link the troubleshooting guide from the integration README.
   docs-use-cases:
     status: todo
   dynamic-devices:
     status: done
+  entity-category:
+    status: todo
+    comment: Mark suggested packs (and any health/diagnostic entity) as diagnostic.
+  entity-device-class:
+    status: done
+  entity-disabled-by-default:
+    status: todo
+    comment: Decide which optional/diagnostic entities start disabled; or document why none do.
+  entity-translations:
+    status: done
   exception-translations:
     status: todo
+    comment: Add exceptions.* to strings.json and use translation_domain/translation_key.
   icon-translations:
     status: todo
+    comment: Move mdi icons into icons.json under entity translation keys.
+  reconfiguration-flow:
+    status: done
   repair-issues:
+    status: done
+  stale-devices:
+    status: done
+
+  # --- Platinum (3) — not required for gold -----------------------------
+  async-dependency:
+    status: exempt
+    comment: No external client library; aiohttp is supplied by Home Assistant.
+  inject-websession:
     status: done
   strict-typing:
     status: todo
