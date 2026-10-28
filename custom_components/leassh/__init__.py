@@ -103,7 +103,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = runtime
 
     # async_forward_entry_setups (not async_forward_platforms, which only
-    # exists from 2024.7) — our manifest floor is 2024.6.
+    # exists from 2024.7) — kept for older installations.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 

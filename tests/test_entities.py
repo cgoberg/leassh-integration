@@ -6,6 +6,7 @@ where the old undefined-name / `_2` suffix bug lived.
 
 from __future__ import annotations
 
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -174,6 +175,45 @@ async def test_binary_sensors_use_host_identity(hass) -> None:
     assert online.has_entity_name is True
     assert online.unique_id == "entry1_192.168.1.131_online"
     assert online.is_on is True
+
+
+async def test_at_desk_is_presence_and_signed_in_stays_occupancy(hass) -> None:
+    entry = make_entry()
+    coordinator = stub_coordinator([NODE])
+    device = node_device(hass, entry, NODE)
+
+    signed_in = NodeBinarySensor(
+        coordinator,
+        entry,
+        "192.168.1.131",
+        device,
+        "occupancy",
+        "signed_in",
+        "human_present",
+    )
+    assert signed_in.device_class is not None
+    assert str(signed_in.device_class) == "occupancy"
+
+    at_desk = NodeBinarySensor(
+        coordinator,
+        entry,
+        "192.168.1.131",
+        device,
+        "presence",
+        "at_desk",
+        "activity",
+    )
+    assert str(at_desk.device_class) == "presence"
+    assert at_desk.unique_id == "entry1_192.168.1.131_at_desk"
+    assert at_desk.is_on is True
+    assert at_desk.extra_state_attributes["activity"] == "Active"
+
+    # Activity falling to idle turns it off after the hold window, not on the
+    # first sample (single-sample flap protection).
+    coordinator.data["nodes"][0]["activity"] = "Idle"
+    assert at_desk.is_on is True
+    at_desk._at_desk_last = time.monotonic() - (at_desk.AT_DESK_HOLD_SECS + 1)
+    assert at_desk.is_on is False
 
 
 async def test_buttons_have_distinct_translation_keys(hass) -> None:

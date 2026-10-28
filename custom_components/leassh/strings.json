@@ -58,6 +58,9 @@
       },
       "signed_in": {
         "name": "Signed in"
+      },
+      "at_desk": {
+        "name": "At desk"
       }
     },
     "sensor": {

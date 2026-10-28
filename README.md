@@ -29,7 +29,7 @@ scope (`ha`) only ever sees a curated action catalog.
 ## Requirements
 
 - A Leassh server ≥ 0.2.0 with the API enabled (see below).
-- Home Assistant ≥ 2024.6.
+- Home Assistant ≥ 2025.1.
 
 ## Server setup (minting the token)
 

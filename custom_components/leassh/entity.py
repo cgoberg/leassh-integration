@@ -71,7 +71,7 @@ def entity_unique_id(
 
 
 # `via_device_id` replaced `via_device` in newer HA (via_device stops
-# working in 2027.8) but does not exist at our 2024.6 floor. Feature-detect
+# working in 2027.8) but did not exist at the old 2024.6 floor. Feature-detect
 # rather than version-guess: the registry signature is the arbiter.
 _REGISTRY_ACCEPTS_VIA_DEVICE_ID = "via_device_id" in inspect.signature(
     dr.DeviceRegistry.async_get_or_create

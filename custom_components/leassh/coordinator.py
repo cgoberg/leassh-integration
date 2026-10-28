@@ -37,6 +37,7 @@ FIXED_ENTITY_KEYS: tuple[str, ...] = (
     "load",
     "online",
     "signed_in",
+    "at_desk",
 )
 
 

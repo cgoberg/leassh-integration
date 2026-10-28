@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from homeassistant.components.binary_sensor import (
@@ -52,9 +53,13 @@ async def async_setup_entry(
                 continue
             for key, device_class, field in (
                 ("online", BinarySensorDeviceClass.CONNECTIVITY, "reachable"),
-                # Deliberately OCCUPANCY for now: the PRESENCE device class
-                # needs a newer HA floor (roadmap M4 open decision).
+                # `signed_in` is console occupancy (a human owns the session),
+                # not home/away: keep OCCUPANCY.
                 ("signed_in", BinarySensorDeviceClass.OCCUPANCY, "human_present"),
+                # `at_desk` is the accurate PRESENCE claim: the human is
+                # actively using the machine now. The Activity sensor is the
+                # source of truth; this is a short-hold projection of it.
+                ("at_desk", BinarySensorDeviceClass.PRESENCE, "activity"),
             ):
                 if (host, key) in seen:
                     continue
@@ -106,9 +111,10 @@ class LeasshConnectedSensor(BinarySensorEntity):
 
 
 class NodeBinarySensor(CoordinatorEntity[LeasshCoordinator], BinarySensorEntity):
-    """Per-node binary sensor (Online / Signed in)."""
+    """Per-node binary sensor (Online / Signed in / At desk)."""
 
     _attr_has_entity_name = True
+    AT_DESK_HOLD_SECS = 60
 
     def __init__(
         self,
@@ -122,7 +128,9 @@ class NodeBinarySensor(CoordinatorEntity[LeasshCoordinator], BinarySensorEntity)
     ) -> None:
         super().__init__(coordinator)
         self._host = host
+        self._key = key
         self._field = field
+        self._at_desk_last: float | None = None
         self._attr_device_class = device_class
         self._attr_translation_key = key
         self._attr_unique_id = entity_unique_id(entry, host, key)
@@ -136,10 +144,26 @@ class NodeBinarySensor(CoordinatorEntity[LeasshCoordinator], BinarySensorEntity)
         return self._node_data() is not None
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        return node_provenance(self._node_data())
-
-    @property
     def is_on(self) -> bool | None:
         data = self._node_data()
-        return bool(data.get(self._field)) if data else None
+        if data is None:
+            return None
+        if self._key == "at_desk":
+            # Hold the ON state briefly so a single idle sample does not flap
+            # the entity. Activity itself already applies the 5-minute band.
+            now = time.monotonic()
+            if str(data.get("activity", "")).lower() == "active":
+                self._at_desk_last = now
+            return (
+                self._at_desk_last is not None
+                and now - self._at_desk_last <= self.AT_DESK_HOLD_SECS
+            )
+        return bool(data.get(self._field))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        attrs = node_provenance(self._node_data())
+        if self._key == "at_desk":
+            attrs["activity"] = (self._node_data() or {}).get("activity")
+            attrs["hold_seconds"] = self.AT_DESK_HOLD_SECS
+        return attrs
