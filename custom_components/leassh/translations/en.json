@@ -155,7 +155,7 @@
         "step": {
           "init": {
             "title": "Repair Leassh license",
-            "description": "Update `license_token` in the add-on or `license_key` in `fleet.yaml`, then re-check. Choose **Update license** or **Upgrade**.",
+            "description": "Choose **Update license** to fix `license_token`/`license_key`, or **Upgrade** at {upgrade_url}.",
             "menu_options": {
               "update_license": "Update the license key",
               "upgrade": "Open upgrade page (leassh.com/pricing)"
@@ -163,11 +163,11 @@
           },
           "update_license": {
             "title": "Update the license key",
-            "description": "In Home Assistant: Settings → Add-ons → Leassh → Configuration → `license_token`. In a manual server: `license_key` in `fleet.yaml`. Restart the Leassh server, then submit to re-check. Free keys start with LSH-; offline paid tokens start with LSH1."
+            "description": "In Home Assistant: Settings → Add-ons → Leassh → Configuration → `license_token`. In a manual server: `license_key` in `fleet.yaml`. Restart Leassh, then submit to re-check. Free keys start with LSH-; offline paid tokens start with LSH1."
           },
           "upgrade": {
             "title": "Upgrade",
-            "description": "Open https://leassh.com/pricing in a browser, then update the license key."
+            "description": "Open {upgrade_url} in a browser, then update the license key."
           }
         }
       }
@@ -178,7 +178,7 @@
         "step": {
           "init": {
             "title": "Repair Leassh license",
-            "description": "Renew at https://leassh.com/account or upgrade at https://leassh.com/pricing. The license expires in {days} day(s).",
+            "description": "Renew at {account_url} or upgrade at {upgrade_url}. The license expires in {days} day(s).",
             "menu_options": {
               "renew": "Renew or view billing",
               "upgrade": "Open upgrade page (leassh.com/pricing)"
@@ -186,11 +186,11 @@
           },
           "renew": {
             "title": "Renew",
-            "description": "Open https://leassh.com/account, enter your pairing code, and use Manage billing. Then submit to re-check."
+            "description": "Open {account_url}, enter your pairing code, and use Manage billing. Then submit to re-check."
           },
           "upgrade": {
             "title": "Upgrade",
-            "description": "Open https://leassh.com/pricing in a browser."
+            "description": "Open {upgrade_url} in a browser."
           }
         }
       }
@@ -257,7 +257,7 @@
           },
           "upgrade": {
             "title": "Upgrade",
-            "description": "Open https://leassh.com/pricing in a browser."
+            "description": "Open {upgrade_url} in a browser."
           }
         }
       }

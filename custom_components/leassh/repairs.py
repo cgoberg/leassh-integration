@@ -68,7 +68,12 @@ def _check_license(hass: HomeAssistant, health: dict) -> None:
                 "tier": str(license_info.get("tier", "current")),
                 "upgrade_url": "https://leassh.com/pricing",
             },
-            data={"upgrade_url": "https://leassh.com/pricing"},
+            data={
+                "upgrade_url": "https://leassh.com/pricing",
+                "current": str(current),
+                "max": str(maximum),
+                "tier": str(license_info.get("tier", "current")),
+            },
         )
     else:
         ir.async_delete_issue(hass, DOMAIN, "node_limit_reached")
@@ -95,7 +100,11 @@ def _check_license(hass: HomeAssistant, health: dict) -> None:
                 "upgrade_url": "https://leassh.com/pricing",
                 "account_url": "https://leassh.com/account",
             },
-            data={"upgrade_url": "https://leassh.com/pricing"},
+            data={
+                "upgrade_url": "https://leassh.com/pricing",
+                "account_url": "https://leassh.com/account",
+                "days": str(max(remaining.days, 0)),
+            },
         )
     else:
         ir.async_delete_issue(hass, DOMAIN, "license_expiring")
@@ -195,8 +204,12 @@ class LeasshRepairFlow(RepairsFlow):
                 step_id="init",
                 menu_options=options,
                 description_placeholders={
-                    "upgrade_url": "https://leassh.com/pricing",
-                    "account_url": "https://leassh.com/account",
+                    "upgrade_url": self.data.get("upgrade_url", "https://leassh.com/pricing"),
+                    "account_url": self.data.get("account_url", "https://leassh.com/account"),
+                    "days": self.data.get("days", "0"),
+                    "current": self.data.get("current", "?"),
+                    "max": self.data.get("max", "?"),
+                    "tier": self.data.get("tier", "current"),
                 },
             )
         if self.issue_id.startswith("pack_parse_"):
