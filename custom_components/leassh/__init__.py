@@ -8,6 +8,7 @@ server-side `ha` scope carries curated verbs only.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -20,7 +21,7 @@ except ImportError:  # HA < 2024.7
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import (
@@ -70,7 +71,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
         await client.get_devices()
     except LeasshAuthError as err:
-        raise ConfigEntryNotReady(f"Leassh token rejected: {err}") from err
+        # Auth failures start HA's reauth flow; only reachability is retried.
+        raise ConfigEntryAuthFailed(f"Leassh token rejected: {err}") from err
     except LeasshConnectionError as err:
         raise ConfigEntryNotReady(f"Leassh unreachable: {err}") from err
 
@@ -81,9 +83,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     runtime.ws = LeasshWsClient(
         hass,
         client,
-        on_event=lambda kind, data: hass.bus.async_fire(
-            EVENT_LEASSH, {"kind": kind, "data": data}
-        ),
+        on_event=runtime.handle_event,
         on_connection_state=runtime.set_connected,
         on_server_notify=runtime.deliver_server_notify,
     )
@@ -121,6 +121,54 @@ class LeasshRuntime:
         self.ws_callbacks: list = []
         # Replaced by notify.py during platform setup (an async callable).
         self.send_notification = None
+        # Presence/activity events are an accelerator over the 30 s poll, not
+        # a source of truth. Coalesce bursts into one listener notification.
+        self._event_pending = False
+
+    def handle_event(self, kind: str, data: dict[str, Any]) -> None:
+        """Apply a push event to coordinator state, debounced 0.5 s.
+
+        `node.online`, `node.offline` and `node.activity` update the affected
+        node in place. The 30 s poll reconciles afterwards; an event is never
+        allowed to become the only source of truth.
+        """
+        name = data.get("node")
+        if not name:
+            return
+        changed = False
+        for node in (self.coordinator.data or {}).get("nodes", []):
+            if node.get("name") != name:
+                continue
+            if kind == "node.online":
+                node["reachable"] = True
+                changed = True
+            elif kind == "node.offline":
+                node["reachable"] = False
+                node["activity"] = "Offline"
+                changed = True
+            elif kind == "node.activity":
+                activity = data.get("activity")
+                if activity is not None:
+                    node["activity"] = activity
+                    changed = True
+            break
+        if changed:
+            self._schedule_event_refresh()
+        # Always publish on the HA event bus for automations.
+        self.hass.bus.async_fire(EVENT_LEASSH, {"kind": kind, "data": data})
+
+    def _schedule_event_refresh(self) -> None:
+        if self._event_pending:
+            return
+        self._event_pending = True
+
+        async def apply() -> None:
+            await asyncio.sleep(0.5)
+            self._event_pending = False
+            if self.coordinator.data is not None:
+                self.coordinator.async_set_updated_data(self.coordinator.data)
+
+        self.hass.async_create_task(apply())
 
     def set_connected(self, connected: bool) -> None:
         self.connected = connected

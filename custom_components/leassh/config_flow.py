@@ -117,6 +117,85 @@ class LeasshConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"server": self._discovered_url or ""},
         )
 
+    async def async_step_reauth(
+        self, entry_data: dict[str, Any]
+    ) -> ConfigFlowResult:
+        """The stored token was rejected: ask for a fresh one, keep the entry."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        entry = self._get_reauth_entry()
+        if user_input is not None:
+            token = user_input[CONF_API_TOKEN]
+            client = LeasshClient(
+                async_get_clientsession(self.hass),
+                normalize_server_url(entry.data[CONF_SERVER_URL]),
+                token,
+            )
+            try:
+                await client.get_devices()
+            except LeasshAuthError:
+                errors["base"] = "invalid_auth"
+            except LeasshConnectionError:
+                errors["base"] = "cannot_connect"
+            else:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data={**entry.data, CONF_API_TOKEN: token},
+                    reason="reauth_successful",
+                )
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema({vol.Required(CONF_API_TOKEN): str}),
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Change the server URL or token without deleting the entry."""
+        errors: dict[str, str] = {}
+        entry = self._get_reconfigure_entry()
+        if user_input is not None:
+            server_url = normalize_server_url(user_input[CONF_SERVER_URL])
+            token = user_input[CONF_API_TOKEN]
+            client = LeasshClient(
+                async_get_clientsession(self.hass), server_url, token
+            )
+            try:
+                await client.get_devices()
+            except LeasshAuthError:
+                errors["base"] = "invalid_auth"
+            except LeasshConnectionError:
+                errors["base"] = "cannot_connect"
+            else:
+                parsed = urlparse(server_url)
+                host = parsed.hostname or server_url
+                return self.async_update_reload_and_abort(
+                    entry,
+                    unique_id=f"{host}:{parsed.port or DEFAULT_PORT}",
+                    data={
+                        **entry.data,
+                        CONF_SERVER_URL: server_url,
+                        CONF_API_TOKEN: token,
+                    },
+                    reason="reconfigure_successful",
+                )
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                STEP_USER_SCHEMA,
+                {
+                    CONF_SERVER_URL: entry.data.get(CONF_SERVER_URL, ""),
+                    CONF_API_TOKEN: entry.data.get(CONF_API_TOKEN, ""),
+                },
+            ),
+            errors=errors,
+        )
+
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> LeasshOptionsFlow:

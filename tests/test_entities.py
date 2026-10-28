@@ -24,7 +24,12 @@ from custom_components.leassh.entity import (
     node_device,
     title_case,
 )
-from custom_components.leassh.sensor import NODE_SENSORS, NodeSensor
+from custom_components.leassh.sensor import (
+    NODE_SENSORS,
+    GenericMetricSensor,
+    NodeSensor,
+    SeriesMetricSensor,
+)
 
 NODE = {
     "name": "gpu-primary-131",
@@ -176,6 +181,115 @@ async def test_buttons_have_distinct_translation_keys(hass) -> None:
     assert getattr(reboot, "_attr_name", None) is None
     assert getattr(signout, "_attr_name", None) is None
     assert reboot.unique_id != signout.unique_id
+
+
+async def test_generic_scalar_metric_uses_pack_metadata(hass) -> None:
+    entry = make_entry()
+    node = dict(
+        NODE,
+        metrics={
+            "cpu_temp_c": {
+                "value": 54.0,
+                "name": "CPU temperature",
+                "unit": "°C",
+                "device_class": "temperature",
+                "state_class": "measurement",
+                "pack": "cpu-thermal",
+                "pack_version": "1.0.0",
+                "observed_at": "2026-10-28T08:00:00Z",
+                "age": 3,
+            }
+        },
+    )
+    coordinator = stub_coordinator([node])
+    device = node_device(hass, entry, node)
+    sensor = GenericMetricSensor(
+        coordinator,
+        entry,
+        "192.168.1.131",
+        device,
+        metric_id="cpu_temp_c",
+        name="CPU temperature",
+        unit="°C",
+        device_class="temperature",
+        state_class="measurement",
+        icon=None,
+        source=node["metrics"]["cpu_temp_c"],
+    )
+    assert sensor.has_entity_name is True
+    assert sensor.unique_id == "entry1_192.168.1.131_cpu_temp_c"
+    assert sensor.name == "CPU temperature"
+    assert sensor.device_class is SensorDeviceClass.TEMPERATURE
+    assert sensor.native_value == 54.0
+    assert sensor.extra_state_attributes["pack"] == "cpu-thermal"
+    assert sensor.extra_state_attributes["age"] == 3
+
+
+async def test_per_gpu_series_names_are_numbered_and_keyed_by_uuid(hass) -> None:
+    entry = make_entry()
+    node = dict(
+        NODE,
+        series={
+            "gpu_nvidia": [
+                {
+                    "key": "GPU-aaa",
+                    "uuid": "GPU-aaa",
+                    "index": 0,
+                    "label": "NVIDIA GeForce RTX 4090",
+                    "values": {"utilization": 9, "temperature": 46},
+                },
+                {
+                    "key": "GPU-bbb",
+                    "uuid": "GPU-bbb",
+                    "index": 1,
+                    "label": "NVIDIA GeForce RTX 4090",
+                    "values": {"utilization": 19, "temperature": 48},
+                },
+            ]
+        },
+    )
+    coordinator = stub_coordinator([node])
+    device = node_device(hass, entry, node)
+    usage0 = SeriesMetricSensor(
+        coordinator,
+        entry,
+        "192.168.1.131",
+        device,
+        series_id="gpu_nvidia",
+        key="GPU-aaa",
+        field="utilization",
+        name="GPU 0 usage",
+        unit="%",
+        device_class=None,
+        state_class="measurement",
+        icon=None,
+        instance=node["series"]["gpu_nvidia"][0],
+        declared=9,
+    )
+    usage1 = SeriesMetricSensor(
+        coordinator,
+        entry,
+        "192.168.1.131",
+        device,
+        series_id="gpu_nvidia",
+        key="GPU-bbb",
+        field="utilization",
+        name="GPU 1 usage",
+        unit="%",
+        device_class=None,
+        state_class="measurement",
+        icon=None,
+        instance=node["series"]["gpu_nvidia"][1],
+        declared=19,
+    )
+    assert usage0.name == "GPU 0 usage"
+    assert usage1.name == "GPU 1 usage"
+    assert usage0.native_value == 9
+    assert usage1.native_value == 19
+    assert usage0.unique_id != usage1.unique_id
+    assert usage0.unique_id.endswith("GPU-aaa")
+    assert usage0.extra_state_attributes["label"] == "NVIDIA GeForce RTX 4090"
+    assert usage0.extra_state_attributes["uuid"] == "GPU-aaa"
 
 
 async def test_lifecycle_prunes_missing_series_on_reachable_node(hass) -> None:

@@ -238,7 +238,12 @@ def _generic_entities(
                     continue
                 seen.add(identity)
                 meta = (instance.get("meta") or {}).get(field, {})
-                display = meta.get("name") or _series_display(label, field)
+                if instance.get("index") is not None:
+                    display = _series_display(instance.get("index"), label, field)
+                else:
+                    display = meta.get("name") or _series_display(
+                        None, label, field
+                    )
                 entities.append(
                     SeriesMetricSensor(
                         coordinator,
@@ -260,9 +265,27 @@ def _generic_entities(
     return entities
 
 
-def _series_display(label: Any, field: str) -> str:
-    prefix = str(label) if label else "Series"
-    return f"{prefix} {field.replace('_', ' ')}"
+_FIELD_WORDS = {
+    "utilization": "usage",
+    "memory_used": "memory used",
+    "memory_total": "memory total",
+}
+
+
+def _series_display(index: Any, label: Any, field: str) -> str:
+    """'GPU 0 usage' / 'GPU 1 temperature'.
+
+    The device prefix comes from `has_entity_name`; the instance number is
+    what distinguishes two identical GPUs. The model name stays an attribute
+    (`label`), so a rename never moves identity.
+    """
+    if index is not None:
+        prefix = f"GPU {index}"
+    elif label:
+        prefix = str(label)
+    else:
+        prefix = "Series"
+    return f"{prefix} {_FIELD_WORDS.get(field, field.replace('_', ' '))}"
 
 
 class NodeSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
