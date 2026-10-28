@@ -115,7 +115,8 @@ def node_device(
             info["via_device_id"] = hub.id
         else:
             info["via_device"] = (DOMAIN, entry.entry_id)
-    info["configuration_url"] = f"ssh://{host}"
+    # No configuration_url: HA only accepts http(s) URLs there, and a node
+    # is reached over SSH, not over a web UI.
     return info
 
 
