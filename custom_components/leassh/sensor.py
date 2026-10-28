@@ -30,7 +30,14 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import LeasshRuntime
 from .const import DOMAIN
 from .coordinator import LeasshCoordinator
-from .entity import entity_unique_id, find_node, node_device, node_host
+from .entity import (
+    entity_unique_id,
+    find_node,
+    hub_device,
+    node_device,
+    node_host,
+    node_provenance,
+)
 
 
 @dataclass(frozen=True)
@@ -198,6 +205,7 @@ async def async_setup_entry(
 
     add_node_sensors()
     entry.async_on_unload(coordinator.async_add_listener(add_node_sensors))
+    async_add_entities([LeasshPackSuggestionsSensor(entry, runtime)])
 
 
 def _generic_entities(
@@ -345,6 +353,10 @@ class NodeSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
     @property
     def available(self) -> bool:
         return self._node_data() is not None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return node_provenance(self._node_data())
 
     @property
     def native_value(self) -> Any:
@@ -521,3 +533,47 @@ def _map_state_class(value: str | None) -> SensorStateClass | None:
         return SensorStateClass(str(value))
     except ValueError:
         return None
+
+
+class LeasshPackSuggestionsSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
+    """Bundled packs that fit the hosts' last tool inventory.
+
+    Discovery is the product: a new user sees `gpu-nvidia` suggested because
+    `nvidia-smi` exists, rather than reading a docs page about packs.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "suggested_packs"
+    _attr_icon = "mdi:puzzle-plus"
+
+    def __init__(self, entry: ConfigEntry, runtime: LeasshRuntime) -> None:
+        super().__init__(runtime.coordinator)
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_suggested_packs"
+        self._attr_device_info = hub_device(entry, runtime.client.base_url)
+
+    def _suggestions(self) -> list[dict[str, Any]]:
+        suggested: list[dict[str, Any]] = []
+        for node in (self.coordinator.suggestions or {}).get("nodes", []):
+            for pack in (node.get("suggested_packs") or []):
+                suggested.append(
+                    {
+                        "pack": pack.get("id"),
+                        "version": pack.get("version"),
+                        "node": node.get("node"),
+                        "reason": pack.get("reason"),
+                    }
+                )
+        return suggested
+
+    @property
+    def native_value(self) -> int:
+        return len(self._suggestions())
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"suggestions": self._suggestions()}
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success

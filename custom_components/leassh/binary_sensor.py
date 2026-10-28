@@ -23,6 +23,7 @@ from .entity import (
     hub_device,
     node_device,
     node_host,
+    node_provenance,
 )
 
 
@@ -133,6 +134,10 @@ class NodeBinarySensor(CoordinatorEntity[LeasshCoordinator], BinarySensorEntity)
     @property
     def available(self) -> bool:
         return self._node_data() is not None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return node_provenance(self._node_data())
 
     @property
     def is_on(self) -> bool | None:

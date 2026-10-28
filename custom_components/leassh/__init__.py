@@ -32,6 +32,7 @@ from .api import (
 )
 from .const import CONF_API_TOKEN, CONF_SERVER_URL, DOMAIN, EVENT_LEASSH
 from .coordinator import LeasshCoordinator
+from .repairs import async_check, async_create_fix_flow  # noqa: F401 - HA discovers this
 from .ws_client import LeasshWsClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -88,6 +89,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         on_server_notify=runtime.deliver_server_notify,
     )
     runtime.ws.start()
+    # Repairs are derived from live evidence on every poll.
+    coordinator.async_add_listener(
+        lambda: hass.async_create_task(async_check(hass, entry, runtime))
+    )
+    hass.async_create_task(async_check(hass, entry, runtime))
     # Registered for the WS watchdog: outage push delivery (notify.py
     # replaces this once its entity exists).
     hass.data[DOMAIN].setdefault("outage_notifier", None)

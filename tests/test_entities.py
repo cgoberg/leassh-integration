@@ -94,6 +94,13 @@ async def test_sensor_names_ids_and_device(hass) -> None:
     assert device is not None
     assert (DOMAIN, "entry1_192.168.1.131") in device["identifiers"]
 
+    node = dict(
+        NODE,
+        engine_version="0.2.1",
+        observed_at="2026-10-28T10:00:00Z",
+        age=4,
+    )
+    coordinator = stub_coordinator([node])
     cpu = NodeSensor(
         coordinator,
         entry,
@@ -107,6 +114,11 @@ async def test_sensor_names_ids_and_device(hass) -> None:
     assert cpu.native_value == 11.2  # rounded for display
     assert cpu.device_class is None
     assert cpu.state_class is SensorStateClass.MEASUREMENT
+    provenance = cpu.extra_state_attributes
+    assert provenance["pack"] == "core"
+    assert provenance["pack_version"] == "0.2.1"
+    assert provenance["observed_at"] == "2026-10-28T10:00:00Z"
+    assert provenance["age"] == 4
 
     temperature = NodeSensor(
         coordinator,

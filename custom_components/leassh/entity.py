@@ -120,6 +120,20 @@ def node_device(
     return info
 
 
+def node_provenance(data: dict | None) -> dict:
+    """Every fixed entity says where its value came from, or why it is blank."""
+    if not data:
+        return {}
+    attrs = {
+        "pack": "core",
+        "pack_version": data.get("engine_version"),
+        "observed_at": data.get("observed_at"),
+        "age": data.get("age"),
+        "last_error": None if data.get("telemetry_ok", True) else "core telemetry missing",
+    }
+    return {k: v for k, v in attrs.items() if v is not None}
+
+
 def find_node(coordinator, host: str) -> dict | None:
     for node in (coordinator.data or {}).get("nodes", []):
         if node_host(node) == host:

@@ -117,6 +117,31 @@ class LeasshClient:
                 raise LeasshApiError(f"/api/devices returned {resp.status}: {body[:200]}")
             return resp.headers.get("ETag"), await resp.json()
 
+    async def get_pack_suggestions(self) -> dict[str, Any]:
+        """Bundled packs whose required tools exist on each node."""
+        resp = await self._request("GET", "/api/packs/suggestions")
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/packs/suggestions returned {resp.status}")
+            return await resp.json()
+
+    async def reload_packs(self) -> dict[str, Any]:
+        resp = await self._request("POST", "/api/packs/reload", json={}, timeout=30)
+        async with resp:
+            body = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"pack reload failed: {body}")
+            return body
+
+    async def set_pack_enabled(self, pack_id: str, enabled: bool) -> dict[str, Any]:
+        verb = "enable" if enabled else "disable"
+        resp = await self._request("POST", f"/api/packs/{pack_id}/{verb}", json={})
+        async with resp:
+            body = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"pack {verb} failed: {body}")
+            return body
+
     async def get_actions(self) -> dict[str, Any]:
         """The curated verb catalog."""
         resp = await self._request("GET", "/api/actions")

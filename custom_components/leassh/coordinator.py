@@ -63,6 +63,10 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Unique ids owned by platforms that are not derived from bulk state
         # (the action-catalog buttons). Never pruned.
         self.protected_unique_ids: set[str] = set()
+        # Last unauthenticated health snapshot: licence, pack counters and
+        # presence pushes. Used by repairs and pack suggestions.
+        self.health: dict[str, Any] = {}
+        self.suggestions: dict[str, Any] = {}
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
@@ -75,6 +79,14 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             assert self.data is not None
             return self.data
         self._etag = etag
+        try:
+            self.health = await self.client.health()
+        except (LeasshApiError, LeasshConnectionError):
+            self.health = {}
+        try:
+            self.suggestions = await self.client.get_pack_suggestions()
+        except (LeasshApiError, LeasshConnectionError):
+            self.suggestions = {}
         self._reconcile(data)
         return data
 
