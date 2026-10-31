@@ -68,6 +68,9 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # presence pushes. Used by repairs and pack suggestions.
         self.health: dict[str, Any] = {}
         self.suggestions: dict[str, Any] = {}
+        # Hub-level summaries: fleet claims/sites/audit and family screen time.
+        self.fleet: dict[str, Any] = {}
+        self.family: dict[str, Any] = {}
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
@@ -76,6 +79,14 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise UpdateFailed(str(err)) from err
         except LeasshAuthError as err:
             raise UpdateFailed(f"token rejected: {err}") from err
+        try:
+            self.fleet = await self.client.ha_summary()
+        except (LeasshApiError, LeasshConnectionError):
+            self.fleet = {}
+        try:
+            self.family = await self.client.family_summary()
+        except (LeasshApiError, LeasshConnectionError):
+            self.family = {}
         if data is None:  # 304: nothing changed
             assert self.data is not None
             return self.data

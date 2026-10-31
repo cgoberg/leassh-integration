@@ -140,6 +140,22 @@ class LeasshClient:
                 raise LeasshApiError(f"/api/devices returned {resp.status}: {body[:200]}")
             return resp.headers.get("ETag"), await resp.json()
 
+    async def ha_summary(self) -> dict[str, Any]:
+        """Compact fleet summary used by the hub sensors."""
+        resp = await self._request("GET", "/api/ha/summary")
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/ha/summary returned {resp.status}")
+            return await resp.json()
+
+    async def family_summary(self) -> dict[str, Any]:
+        """Per-device screen time, limits and bedtime for parent dashboards."""
+        resp = await self._request("GET", "/api/family/summary")
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/family/summary returned {resp.status}")
+            return await resp.json()
+
     async def get_pack_suggestions(self) -> dict[str, Any]:
         """Bundled packs whose required tools exist on each node."""
         resp = await self._request("GET", "/api/packs/suggestions")

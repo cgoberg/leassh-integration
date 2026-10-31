@@ -208,6 +208,7 @@ async def async_setup_entry(
     async_add_entities([
         LeasshPackSuggestionsSensor(entry, runtime),
         LeasshLicenseSensor(entry, runtime),
+        *[LeasshHubSensor(entry, runtime, description) for description in HUB_SENSORS],
     ])
 
 
@@ -536,6 +537,151 @@ def _map_state_class(value: str | None) -> SensorStateClass | None:
         return SensorStateClass(str(value))
     except ValueError:
         return None
+
+
+@dataclass(frozen=True)
+class HubSensorDescription:
+    key: str
+    name: str
+    icon: str
+    unit: str | None = None
+    state_class: SensorStateClass | None = None
+    attributes: tuple[str, ...] = ()
+    source: str = "fleet"
+
+
+HUB_SENSORS: tuple[HubSensorDescription, ...] = (
+    HubSensorDescription(
+        "fleet_state",
+        "Fleet state",
+        "mdi:server-network",
+        attributes=(
+            "claims",
+            "sites",
+            "blocked_nodes",
+            "recent_actions",
+            "weekly_narrative",
+            "ledger_last_hash",
+            "generated_at",
+        ),
+    ),
+    HubSensorDescription(
+        "fleet_reachable",
+        "Reachable nodes",
+        "mdi:lan-connect",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    HubSensorDescription(
+        "fleet_open_claims",
+        "Open claims",
+        "mdi:alert-circle-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    HubSensorDescription(
+        "fleet_critical_claims",
+        "Critical claims",
+        "mdi:alert-octagon",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    HubSensorDescription(
+        "fleet_ledger_valid",
+        "Ledger",
+        "mdi:shield-check",
+        attributes=("ledger_last_hash",),
+    ),
+    HubSensorDescription(
+        "family_screen_time",
+        "Family screen time",
+        "mdi:timer-outline",
+        unit=UnitOfTime.MINUTES,
+        state_class=SensorStateClass.MEASUREMENT,
+        attributes=("children", "narrative", "over_limit_children", "bedtime_active_children", "generated_at"),
+        source="family",
+    ),
+    HubSensorDescription(
+        "family_over_limit",
+        "Family over limit",
+        "mdi:alert-circle",
+        state_class=SensorStateClass.MEASUREMENT,
+        source="family",
+    ),
+    HubSensorDescription(
+        "family_bedtime_active",
+        "Family bedtime active",
+        "mdi:weather-night",
+        state_class=SensorStateClass.MEASUREMENT,
+        source="family",
+    ),
+    HubSensorDescription(
+        "family_devices",
+        "Family devices",
+        "mdi:devices",
+        state_class=SensorStateClass.MEASUREMENT,
+        source="family",
+    ),
+)
+
+
+class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
+    """Hub-level fleet or family sensor."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        entry: ConfigEntry,
+        runtime: LeasshRuntime,
+        description: HubSensorDescription,
+    ) -> None:
+        super().__init__(runtime.coordinator)
+        self._entry = entry
+        self._description = description
+        self._attr_unique_id = f"{entry.entry_id}_{description.key}"
+        self._attr_name = description.name
+        self._attr_icon = description.icon
+        if description.unit:
+            self._attr_native_unit_of_measurement = description.unit
+        if description.state_class:
+            self._attr_state_class = description.state_class
+        self._attr_device_info = hub_device(entry, runtime.client.base_url)
+
+    def _data(self) -> dict[str, Any]:
+        if self._description.source == "family":
+            return self.coordinator.family or {}
+        return self.coordinator.fleet or {}
+
+    @property
+    def native_value(self) -> Any:
+        data = self._data()
+        if not data:
+            return None
+        key = self._description.key
+        if key == "fleet_state":
+            total = data.get("total") or 0
+            reachable = data.get("reachable") or 0
+            return "ok" if total > 0 and reachable == total else "degraded"
+        if key == "fleet_reachable":
+            return data.get("reachable")
+        if key == "fleet_ledger_valid":
+            return "valid" if data.get("ledger_valid") else "invalid"
+        if key == "family_screen_time":
+            return round((data.get("total_screen_seconds") or 0) / 60)
+        if key == "family_devices":
+            return len(data.get("children") or [])
+        return data.get(key)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        data = self._data()
+        return {
+            name: data.get(name)
+            for name in self._description.attributes
+            if name in data
+        }
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success and bool(self._data())
 
 
 class LeasshPackSuggestionsSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
