@@ -72,6 +72,7 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.fleet: dict[str, Any] = {}
         self.family: dict[str, Any] = {}
         self.consent: dict[str, Any] = {}
+        self.idle_policy: dict[str, Any] = {}
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
@@ -92,6 +93,10 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.consent = await self.client.consent()
         except (LeasshApiError, LeasshConnectionError):
             self.consent = {}
+        try:
+            self.idle_policy = await self.client.idle_policy()
+        except (LeasshApiError, LeasshConnectionError):
+            self.idle_policy = {}
         if data is None:  # 304: nothing changed
             assert self.data is not None
             return self.data

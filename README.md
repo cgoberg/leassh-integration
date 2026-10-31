@@ -15,8 +15,9 @@ scope (`ha`) only ever sees a curated action catalog.
   (`ok` / `attention` / `degraded` / `critical`), `sensor.leassh_fleet_reachable`, `sensor.leassh_fleet_open_claims`,
   `sensor.leassh_fleet_critical_claims`, `sensor.leassh_fleet_ledger_valid`,
   `sensor.leassh_family_screen_time`, `sensor.leassh_family_over_limit`,
-  `sensor.leassh_family_bedtime_active`, `sensor.leassh_family_devices` and
-  `sensor.leassh_consent`. Fleet claims, sites, blockers and recent actions
+  `sensor.leassh_family_bedtime_active`, `sensor.leassh_family_devices`,
+  `sensor.leassh_consent` and `sensor.leassh_idle_policy` (effective
+  idle-logout/app-reclamation policy per node). Fleet claims, sites, blockers and recent actions
   are attributes; family children, limits and bedtime are attributes.
 - **Per-child family sensors** — `sensor.<node>_screen_time_today`,
   `sensor.<node>_screen_time_limit` (`No limit` / `Within limit` /

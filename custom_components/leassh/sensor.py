@@ -648,6 +648,13 @@ HUB_SENSORS: tuple[HubSensorDescription, ...] = (
         source="consent",
     ),
     HubSensorDescription(
+        "idle_policy",
+        "Idle policy",
+        "mdi:tune",
+        attributes=("nodes", "enabled_count", "override_count", "defaults"),
+        source="idle_policy",
+    ),
+    HubSensorDescription(
         "family_screen_time",
         "Family screen time",
         "mdi:timer-outline",
@@ -716,6 +723,8 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
             return self.coordinator.family or {}
         if self._description.source == "consent":
             return self.coordinator.consent or {}
+        if self._description.source == "idle_policy":
+            return self.coordinator.idle_policy or {}
         return self.coordinator.fleet or {}
 
     @property
@@ -746,6 +755,8 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
             return round((reachable / total) * 100) if total else 0
         if key == "consent":
             return data.get("total")
+        if key == "idle_policy":
+            return data.get("enabled_count", 0)
         if key == "fleet_ledger_valid":
             return "valid" if data.get("ledger_valid") else "invalid"
         if key == "family_screen_time":

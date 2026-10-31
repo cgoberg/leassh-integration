@@ -156,6 +156,14 @@ class LeasshClient:
                 raise LeasshApiError(f"/api/consent returned {resp.status}")
             return await resp.json()
 
+    async def idle_policy(self) -> dict[str, Any]:
+        """Effective idle-session and app-reclamation policy per node."""
+        resp = await self._request("GET", "/api/idle-policy")
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/idle-policy returned {resp.status}")
+            return await resp.json()
+
     async def family_summary(self) -> dict[str, Any]:
         """Per-device screen time, limits and bedtime for parent dashboards."""
         resp = await self._request("GET", "/api/family/summary")
