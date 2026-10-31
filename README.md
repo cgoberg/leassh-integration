@@ -18,6 +18,10 @@ scope (`ha`) only ever sees a curated action catalog.
   `sensor.leassh_family_bedtime_active`, `sensor.leassh_family_devices` and
   `sensor.leassh_consent`. Fleet claims, sites, blockers and recent actions
   are attributes; family children, limits and bedtime are attributes.
+- **Per-child family sensors** — `sensor.<node>_screen_time_today`,
+  `sensor.<node>_screen_time_limit` (`No limit` / `Within limit` /
+  `Over limit`) and `sensor.<node>_bedtime` (`Off` / `Scheduled` /
+  `Active`). These power native HA entity cards and history.
 - **Console occupancy vs presence** — `binary_sensor.<node>_signed_in`
   maps the server's `console_signed_in` field: a human owns the console,
   even if idle. `binary_sensor.<node>_at_desk` is the active-presence

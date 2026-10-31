@@ -17,6 +17,7 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from custom_components.leassh.binary_sensor import NodeBinarySensor
 from custom_components.leassh.button import ActionButton
 from custom_components.leassh.const import DOMAIN
+from custom_components.leassh.const import FAMILY_SENSOR_KEYS
 from custom_components.leassh.coordinator import FIXED_ENTITY_KEYS, LeasshCoordinator
 from custom_components.leassh.entity import (
     device_identifier,
@@ -438,6 +439,8 @@ async def test_lifecycle_expects_fixed_and_generic_entities(hass) -> None:
     )
     expected = coordinator._expected_unique_ids(entry, "192.168.1.131", node)
     for key in FIXED_ENTITY_KEYS:
+        assert entity_unique_id(entry, "192.168.1.131", key) in expected
+    for key in FAMILY_SENSOR_KEYS:
         assert entity_unique_id(entry, "192.168.1.131", key) in expected
     assert "entry1_192.168.1.131_cpu_temp_c" in expected
     assert "entry1_192.168.1.131_gpu_nvidia_temperature_GPU-abc" in expected

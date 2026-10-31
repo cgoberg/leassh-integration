@@ -13,7 +13,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import LeasshApiError, LeasshAuthError, LeasshClient, LeasshConnectionError
-from .const import DOMAIN
+from .const import DOMAIN, FAMILY_SENSOR_KEYS
 from .entity import device_identifier, entity_unique_id, node_host
 
 _LOGGER = logging.getLogger(__name__)
@@ -180,6 +180,9 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self, entry: ConfigEntry, host: str, node: dict[str, Any]
     ) -> set[str]:
         expected = {entity_unique_id(entry, host, key) for key in FIXED_ENTITY_KEYS}
+        expected |= {
+            entity_unique_id(entry, host, key) for key in FAMILY_SENSOR_KEYS
+        }
         for metric_id in (node.get("metrics") or {}):
             expected.add(entity_unique_id(entry, host, metric_id))
         for series_id, instances in (node.get("series") or {}).items():

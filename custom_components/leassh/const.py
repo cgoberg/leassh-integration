@@ -24,3 +24,11 @@ KIND_NOTIFY = "notify"
 
 ATTR_KIND = "kind"
 ATTR_DATA = "data"
+
+# Per-child family sensors. These are fixed identities for nodes that appear
+# in the family summary; the coordinator's lifecycle pruner must keep them.
+FAMILY_SENSOR_KEYS = (
+    "screen_time_today",
+    "screen_time_status",
+    "bedtime_status",
+)

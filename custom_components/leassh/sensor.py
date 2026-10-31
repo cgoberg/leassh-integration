@@ -40,6 +40,7 @@ from .entity import (
 )
 
 
+
 @dataclass(frozen=True)
 class NodeSensorDescription:
     key: str
@@ -205,6 +206,45 @@ async def async_setup_entry(
 
     add_node_sensors()
     entry.async_on_unload(coordinator.async_add_listener(add_node_sensors))
+
+    child_seen: set[tuple[str, str]] = set()
+
+    def add_child_sensors() -> None:
+        new: list[SensorEntity] = []
+        children = (coordinator.family or {}).get("children", [])
+        for child in children:
+            name = child.get("name")
+            if not name:
+                continue
+            node = next(
+                (
+                    candidate
+                    for candidate in (coordinator.data or {}).get("nodes", [])
+                    if candidate.get("name") == name
+                ),
+                None,
+            )
+            if node is None:
+                continue
+            device = node_device(hass, entry, node)
+            if device is None:
+                continue
+            identity = node_host(node) or name
+            for description in CHILD_SENSORS:
+                key = (identity, description.key)
+                if key in child_seen:
+                    continue
+                child_seen.add(key)
+                new.append(
+                    LeasshChildSensor(
+                        coordinator, entry, name, identity, device, description
+                    )
+                )
+        if new:
+            async_add_entities(new)
+
+    add_child_sensors()
+    entry.async_on_unload(coordinator.async_add_listener(add_child_sensors))
     async_add_entities([
         LeasshPackSuggestionsSensor(entry, runtime),
         LeasshLicenseSensor(entry, runtime),
@@ -730,6 +770,122 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
     @property
     def available(self) -> bool:
         return self.coordinator.last_update_success and bool(self._data())
+
+
+@dataclass(frozen=True)
+class ChildSensorDescription:
+    key: str
+    name: str
+    icon: str
+    unit: str | None = None
+    state_class: SensorStateClass | None = None
+
+
+CHILD_SENSORS: tuple[ChildSensorDescription, ...] = (
+    ChildSensorDescription(
+        "screen_time_today",
+        "Screen time today",
+        "mdi:timer-outline",
+        unit=UnitOfTime.MINUTES,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ChildSensorDescription(
+        "screen_time_status",
+        "Screen time limit",
+        "mdi:timer-check-outline",
+    ),
+    ChildSensorDescription(
+        "bedtime_status",
+        "Bedtime",
+        "mdi:weather-night",
+    ),
+)
+
+
+class LeasshChildSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
+    """Parent-facing per-child screen time, limit and bedtime state."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: LeasshCoordinator,
+        entry: ConfigEntry,
+        child_name: str,
+        identity: str,
+        device: DeviceInfo,
+        description: ChildSensorDescription,
+    ) -> None:
+        super().__init__(coordinator)
+        self._entry = entry
+        self._child_name = child_name
+        self._description = description
+        self._attr_unique_id = f"{entry.entry_id}_{identity}_{description.key}"
+        self._attr_name = description.name
+        self._attr_icon = description.icon
+        if description.unit:
+            self._attr_native_unit_of_measurement = description.unit
+        if description.state_class:
+            self._attr_state_class = description.state_class
+        self._attr_device_info = device
+
+    def _child(self) -> dict[str, Any] | None:
+        for child in (self.coordinator.family or {}).get("children", []):
+            if child.get("name") == self._child_name:
+                return child
+        return None
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success and self._child() is not None
+
+    @property
+    def native_value(self) -> Any:
+        child = self._child() or {}
+        if self._description.key == "screen_time_today":
+            screen = child.get("screen_time") or {}
+            return round((screen.get("total_seconds") or 0) / 60)
+        if self._description.key == "screen_time_status":
+            limits = child.get("limits") or []
+            if not limits:
+                return "No limit"
+            return "Over limit" if any(limit.get("over_limit") for limit in limits) else "Within limit"
+        bedtime = child.get("bedtime") or {}
+        if not bedtime.get("bedtime_enabled"):
+            return "Off"
+        return "Active" if bedtime.get("bedtime_active") else "Scheduled"
+
+    @property
+    def icon(self) -> str:
+        if self._description.key == "screen_time_status":
+            state = self.native_value
+            if state == "Over limit":
+                return "mdi:timer-alert-outline"
+            if state == "No limit":
+                return "mdi:timer-off-outline"
+            return "mdi:timer-check-outline"
+        if self._description.key == "bedtime_status":
+            return "mdi:weather-night" if self.native_value == "Active" else "mdi:weather-night-partly-cloudy"
+        return self._description.icon
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        child = self._child() or {}
+        if self._description.key == "screen_time_today":
+            return {
+                "date": (child.get("screen_time") or {}).get("date"),
+                "categories": (child.get("screen_time") or {}).get("categories") or [],
+                "limits": child.get("limits") or [],
+                "bedtime": child.get("bedtime") or {},
+                "online": child.get("online"),
+                "at_desk": child.get("at_desk"),
+                "console_signed_in": child.get("console_signed_in"),
+                "open_claims": child.get("open_claims") or [],
+                "account": child.get("account"),
+            }
+        if self._description.key == "screen_time_status":
+            return {"limits": child.get("limits") or []}
+        return {"bedtime": child.get("bedtime") or {}}
 
 
 class LeasshPackSuggestionsSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
