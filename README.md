@@ -11,8 +11,8 @@ scope (`ha`) only ever sees a curated action catalog.
 
 - **One HA device per fleet node** — online, signed-in, activity, CPU, RAM,
   load sensors.
-- **Fleet and family hub sensors** — `sensor.leassh_fleet_state`,
-  `sensor.leassh_fleet_reachable`, `sensor.leassh_fleet_open_claims`,
+- **Fleet and family hub sensors** — `sensor.leassh_fleet_state`
+  (`ok` / `attention` / `degraded` / `critical`), `sensor.leassh_fleet_reachable`, `sensor.leassh_fleet_open_claims`,
   `sensor.leassh_fleet_critical_claims`, `sensor.leassh_fleet_ledger_valid`,
   `sensor.leassh_family_screen_time`, `sensor.leassh_family_over_limit`,
   `sensor.leassh_family_bedtime_active`, `sensor.leassh_family_devices` and
