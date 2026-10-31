@@ -11,7 +11,14 @@ scope (`ha`) only ever sees a curated action catalog.
 
 - **One HA device per fleet node** — online, signed-in, activity, CPU, RAM,
   load sensors.
-- **`binary_sensor.leassh_connected`** — the watchdog. The WS connection
+- **Fleet and family hub sensors** — `sensor.leassh_fleet_state`,
+  `sensor.leassh_fleet_reachable`, `sensor.leassh_fleet_open_claims`,
+  `sensor.leassh_fleet_critical_claims`, `sensor.leassh_fleet_ledger_valid`,
+  `sensor.leassh_family_screen_time`, `sensor.leassh_family_over_limit`,
+  `sensor.leassh_family_bedtime_active`, `sensor.leassh_family_devices` and
+  `sensor.leassh_consent`. Fleet claims, sites, blockers and recent actions
+  are attributes; family children, limits and bedtime are attributes.
+- **`binary_sensor.leassh_server_connected`** — the watchdog. The WS connection
   state *is* the heartbeat; if the server goes silent for >75 s it flips
   off, and after 5 minutes HA raises a persistent notification and a
   companion-app alert ("monitoring interrupted") — delivered by HA itself,
@@ -86,7 +93,7 @@ automation:
   - alias: Leassh down
     trigger:
       - platform: state
-        entity_id: binary_sensor.leassh_connected
+        entity_id: binary_sensor.leassh_server_connected
         to: "off"
         for: "00:05:00"
     action:
