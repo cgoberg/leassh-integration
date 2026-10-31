@@ -687,7 +687,13 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
         if key == "fleet_state":
             total = data.get("total") or 0
             reachable = data.get("reachable") or 0
-            return "ok" if total > 0 and reachable == total else "degraded"
+            if (data.get("critical_claims") or 0) > 0:
+                return "critical"
+            if total == 0 or reachable < total:
+                return "degraded"
+            if (data.get("open_claims") or 0) > 0:
+                return "attention"
+            return "ok"
         if key == "fleet_reachable":
             return data.get("reachable")
         if key == "fleet_open_claims":
