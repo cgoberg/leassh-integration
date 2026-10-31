@@ -148,6 +148,14 @@ class LeasshClient:
                 raise LeasshApiError(f"/api/ha/summary returned {resp.status}")
             return await resp.json()
 
+    async def consent(self) -> dict[str, Any]:
+        """Transparency view for parent dashboards."""
+        resp = await self._request("GET", "/api/consent")
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/consent returned {resp.status}")
+            return await resp.json()
+
     async def family_summary(self) -> dict[str, Any]:
         """Per-device screen time, limits and bedtime for parent dashboards."""
         resp = await self._request("GET", "/api/family/summary")

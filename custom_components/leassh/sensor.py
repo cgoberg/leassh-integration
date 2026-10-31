@@ -556,6 +556,10 @@ HUB_SENSORS: tuple[HubSensorDescription, ...] = (
         "Fleet state",
         "mdi:server-network",
         attributes=(
+            "total",
+            "reachable",
+            "open_claims",
+            "critical_claims",
             "claims",
             "sites",
             "blocked_nodes",
@@ -588,6 +592,20 @@ HUB_SENSORS: tuple[HubSensorDescription, ...] = (
         "Ledger",
         "mdi:shield-check",
         attributes=("ledger_last_hash",),
+    ),
+    HubSensorDescription(
+        "fleet_reachable_percent",
+        "Reachable percent",
+        "mdi:gauge",
+        unit=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    HubSensorDescription(
+        "consent",
+        "Consent summary",
+        "mdi:shield-account",
+        attributes=("statement", "nodes", "total"),
+        source="consent",
     ),
     HubSensorDescription(
         "family_screen_time",
@@ -625,7 +643,10 @@ HUB_SENSORS: tuple[HubSensorDescription, ...] = (
 class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
     """Hub-level fleet or family sensor."""
 
-    _attr_has_entity_name = True
+    # Hub entities carry the product name themselves so their entity IDs stay
+    # stable and dashboard-friendly (sensor.leassh_fleet_state), independent
+    # of the hub device's display name.
+    _attr_has_entity_name = False
 
     def __init__(
         self,
@@ -637,7 +658,7 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
         self._entry = entry
         self._description = description
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
-        self._attr_name = description.name
+        self._attr_name = f"Leassh {description.name}"
         self._attr_icon = description.icon
         if description.unit:
             self._attr_native_unit_of_measurement = description.unit
@@ -645,9 +666,16 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
             self._attr_state_class = description.state_class
         self._attr_device_info = hub_device(entry, runtime.client.base_url)
 
+    @property
+    def suggested_object_id(self) -> str:
+        """Keep hub entity IDs short and stable across device renames."""
+        return f"leassh_{self._description.key}"
+
     def _data(self) -> dict[str, Any]:
         if self._description.source == "family":
             return self.coordinator.family or {}
+        if self._description.source == "consent":
+            return self.coordinator.consent or {}
         return self.coordinator.fleet or {}
 
     @property
@@ -662,10 +690,24 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
             return "ok" if total > 0 and reachable == total else "degraded"
         if key == "fleet_reachable":
             return data.get("reachable")
+        if key == "fleet_open_claims":
+            return data.get("open_claims")
+        if key == "fleet_critical_claims":
+            return data.get("critical_claims")
+        if key == "fleet_reachable_percent":
+            total = data.get("total") or 0
+            reachable = data.get("reachable") or 0
+            return round((reachable / total) * 100) if total else 0
+        if key == "consent":
+            return data.get("total")
         if key == "fleet_ledger_valid":
             return "valid" if data.get("ledger_valid") else "invalid"
         if key == "family_screen_time":
             return round((data.get("total_screen_seconds") or 0) / 60)
+        if key == "family_over_limit":
+            return data.get("over_limit_children")
+        if key == "family_bedtime_active":
+            return data.get("bedtime_active_children")
         if key == "family_devices":
             return len(data.get("children") or [])
         return data.get(key)

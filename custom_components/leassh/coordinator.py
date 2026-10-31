@@ -71,6 +71,7 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Hub-level summaries: fleet claims/sites/audit and family screen time.
         self.fleet: dict[str, Any] = {}
         self.family: dict[str, Any] = {}
+        self.consent: dict[str, Any] = {}
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
@@ -87,6 +88,10 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.family = await self.client.family_summary()
         except (LeasshApiError, LeasshConnectionError):
             self.family = {}
+        try:
+            self.consent = await self.client.consent()
+        except (LeasshApiError, LeasshConnectionError):
+            self.consent = {}
         if data is None:  # 304: nothing changed
             assert self.data is not None
             return self.data
