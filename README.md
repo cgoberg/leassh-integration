@@ -19,9 +19,9 @@ scope (`ha`) only ever sees a curated action catalog.
   `sensor.leassh_consent`. Fleet claims, sites, blockers and recent actions
   are attributes; family children, limits and bedtime are attributes.
 - **Console occupancy vs presence** — `binary_sensor.<node>_signed_in`
-  maps the server's `console_signed_in` field (legacy alias
-  `human_present`): a human owns the console, even if idle.
-  `binary_sensor.<node>_at_desk` is the active-presence entity.
+  maps the server's `console_signed_in` field: a human owns the console,
+  even if idle. `binary_sensor.<node>_at_desk` is the active-presence
+  entity.
 - **`binary_sensor.leassh_server_connected`** — the watchdog. The WS connection
   state *is* the heartbeat; if the server goes silent for >75 s it flips
   off, and after 5 minutes HA raises a persistent notification and a

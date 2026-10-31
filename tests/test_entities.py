@@ -189,7 +189,7 @@ async def test_at_desk_is_presence_and_signed_in_stays_occupancy(hass) -> None:
         device,
         "occupancy",
         "signed_in",
-        "human_present",
+        "console_signed_in",
     )
     assert signed_in.device_class is not None
     assert str(signed_in.device_class) == "occupancy"
