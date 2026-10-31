@@ -54,8 +54,9 @@ async def async_setup_entry(
             for key, device_class, field in (
                 ("online", BinarySensorDeviceClass.CONNECTIVITY, "reachable"),
                 # `signed_in` is console occupancy (a human owns the session),
-                # not home/away: keep OCCUPANCY.
-                ("signed_in", BinarySensorDeviceClass.OCCUPANCY, "human_present"),
+                # not home/away: keep OCCUPANCY. The canonical server field is
+                # `console_signed_in`; `human_present` is a legacy alias.
+                ("signed_in", BinarySensorDeviceClass.OCCUPANCY, "console_signed_in"),
                 # `at_desk` is the accurate PRESENCE claim: the human is
                 # actively using the machine now. The Activity sensor is the
                 # source of truth; this is a short-hold projection of it.
@@ -157,6 +158,10 @@ class NodeBinarySensor(CoordinatorEntity[LeasshCoordinator], BinarySensorEntity)
             return (
                 self._at_desk_last is not None
                 and now - self._at_desk_last <= self.AT_DESK_HOLD_SECS
+            )
+        if self._key == "signed_in":
+            return bool(
+                data.get("console_signed_in", data.get("human_present"))
             )
         return bool(data.get(self._field))
 
