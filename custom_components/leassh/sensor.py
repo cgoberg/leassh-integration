@@ -642,7 +642,13 @@ HUB_SENSORS: tuple[HubSensorDescription, ...] = (
         "Recipes installed",
         "mdi:book-open-variant",
         state_class=SensorStateClass.MEASUREMENT,
-        attributes=("catalog_count", "installed_count", "instance_count", "bundles"),
+        attributes=(
+            "catalog_count",
+            "installed_count",
+            "instance_count",
+            "bundles",
+            "instances",
+        ),
         source="recipes",
     ),
     HubSensorDescription(
@@ -676,6 +682,10 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_name = f"Leassh {description.name}"
         self._attr_icon = description.icon
+        # HA 2026.8+ prefixes device names to object-id bases even when
+        # has_entity_name is False. Setting entity_id explicitly makes the
+        # platform treat it as a suggestion, so dashboard ids stay stable.
+        self.entity_id = f"sensor.leassh_{description.key}"
         if description.unit:
             self._attr_native_unit_of_measurement = description.unit
         if description.state_class:
@@ -770,6 +780,7 @@ class RecipeStatusSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
         instance = record.get("instance") or {}
         self._recipe_id = instance.get("recipe_id", self._instance_id)
         self._attr_name = f"Recipe {self._recipe_id}"
+        self.entity_id = "sensor." + self.suggested_object_id
 
     @property
     def suggested_object_id(self) -> str:

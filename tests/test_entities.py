@@ -13,6 +13,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+from homeassistant.helpers import device_registry as dr
 
 from custom_components.leassh.binary_sensor import NodeBinarySensor
 from custom_components.leassh.button import ActionButton
@@ -86,6 +87,24 @@ def test_entity_unique_id_is_host_based() -> None:
     )
     assert entity_unique_id(entry, "192.168.1.131", "gpu_nvidia_temperature", "GPU-abc") == (
         "entry1_192.168.1.131_gpu_nvidia_temperature_GPU-abc"
+    )
+
+
+async def test_node_device_links_to_registered_hub(hass) -> None:
+    entry = make_entry()
+    entry.add_to_hass(hass)
+    hub = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id)},
+        name="Leassh Server",
+        manufacturer="Leassh",
+        model="Fleet server",
+    )
+    device = node_device(hass, entry, NODE)
+    assert device is not None
+    assert device.get("via_device_id") == hub.id or device.get("via_device") == (
+        DOMAIN,
+        entry.entry_id,
     )
 
 
@@ -482,6 +501,7 @@ async def test_recipe_status_sensor_exposes_why_and_next_run(hass) -> None:
         entry, runtime, coordinator.recipe_instances[0]
     )
     assert sensor.unique_id == "entry1_recipe_inst-1"
+    assert sensor.entity_id == "sensor.leassh_recipe_household_bedtime"
     assert sensor.native_value == "active"
     attrs = sensor.extra_state_attributes
     assert attrs["recipe_id"] == "household.bedtime"

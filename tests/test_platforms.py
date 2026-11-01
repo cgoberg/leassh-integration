@@ -131,6 +131,9 @@ async def test_hub_sensors_cover_fleet_consent_setup_and_recipes(hass) -> None:
         attrs = sensor.extra_state_attributes
         assert isinstance(attrs, dict)
         assert value is not None or description.key == "setup_status"
+        assert sensor.entity_id == f"sensor.leassh_{description.key}"
+        if description.key == "recipes_installed":
+            assert sensor.extra_state_attributes["instances"] == [{}]
 
     suggestions = LeasshPackSuggestionsSensor(entry, runtime)
     coordinator.suggestions = {"nodes": [{"node": "rig", "suggested_packs": [{"id": "gpu"}]}]}

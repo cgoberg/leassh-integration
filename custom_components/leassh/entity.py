@@ -15,6 +15,7 @@ Naming policy:
 from __future__ import annotations
 
 import inspect
+from typing import cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -102,9 +103,20 @@ def node_device(
     # Link via the hub's registry id. The hub device is created by the
     # connected sensor; when it is not registered yet the link is simply
     # omitted and the device attaches on a later entity update.
-    hub = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    registry = dr.async_get(hass)
+    get_by_identifier = getattr(
+        registry, "async_get_device_by_identifier", None
+    )
+    if get_by_identifier is not None:
+        # HA 2026.8+: identifiers are unique per config entry.
+        hub = get_by_identifier((DOMAIN, entry.entry_id), entry.entry_id)
+    else:
+        hub = registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
     if hub is not None:
-        info["via_device"] = (DOMAIN, entry.entry_id)
+        if "via_device_id" in getattr(DeviceInfo, "__annotations__", {}):
+            info = cast(DeviceInfo, {**info, "via_device_id": hub.id})
+        else:
+            info = cast(DeviceInfo, {**info, "via_device": (DOMAIN, entry.entry_id)})
     # No configuration_url: HA only accepts http(s) URLs there, and a node
     # is reached over SSH, not over a web UI.
     return info
