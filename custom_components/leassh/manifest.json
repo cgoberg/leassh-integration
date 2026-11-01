@@ -22,5 +22,8 @@
   "version": "0.4.5",
   "zeroconf": [
     "_leassh._tcp.local."
+  ],
+  "categories": [
+    "computers_network"
   ]
 }
