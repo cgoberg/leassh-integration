@@ -77,6 +77,28 @@ dry_run_recipe:
         number:
           min: 0
           max: 1440
+install_pack:
+  name: Install stack pack
+  description: Install a curated pack as paused automations.
+  fields:
+    pack_id:
+      required: true
+      selector:
+        text:
+    target:
+      selector:
+        text:
+    fleet:
+      selector:
+        text:
+uninstall_pack:
+  name: Uninstall stack pack
+  description: Remove only the automations created by a pack.
+  fields:
+    pack_id:
+      required: true
+      selector:
+        text:
 set_protection_profile:
   name: Set protection profile
   description: Choose Guardian, Trusted owner, Unrestricted or Custom.

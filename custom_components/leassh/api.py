@@ -346,6 +346,38 @@ class LeasshClient:
                 raise LeasshApiError(f"recipe status returned {resp.status}")
             return await resp.json()
 
+    async def list_recipe_packs(self) -> dict[str, Any]:
+        resp = await self._request("GET", "/api/recipe-packs")
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/recipe-packs returned {resp.status}")
+            return await resp.json()
+
+    async def install_recipe_pack(
+        self, pack_id: str, target: str | None = None, fleet: str = "local"
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {"fleet": fleet, "canary": True}
+        if target:
+            body["target"] = target
+        resp = await self._request(
+            "POST", f"/api/recipe-packs/{pack_id}/install", json=body
+        )
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"install pack failed: {payload}")
+            return payload
+
+    async def uninstall_recipe_pack(self, pack_id: str) -> dict[str, Any]:
+        resp = await self._request(
+            "POST", f"/api/recipe-packs/{pack_id}/uninstall", json={}
+        )
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"uninstall pack failed: {payload}")
+            return payload
+
     async def capability_manifest(self) -> dict[str, Any]:
         resp = await self._request("GET", "/api/capabilities?client=ha")
         async with resp:

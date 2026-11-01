@@ -69,7 +69,11 @@ def _first_runtime(hass: HomeAssistant) -> "LeasshRuntime | None":
 
 def _register_services(hass: HomeAssistant) -> None:
     """Register the shared control-plane actions as HA services."""
-    if hass.services.has_service(DOMAIN, "install_recipe"):
+    # Register-once guard. Check the newest service too, so an upgrade that
+    # adds services still registers them when the older ones already exist.
+    if hass.services.has_service(DOMAIN, "install_recipe") and hass.services.has_service(
+        DOMAIN, "install_pack"
+    ):
         return
 
     async def add_node(call) -> None:
@@ -141,6 +145,24 @@ def _register_services(hass: HomeAssistant) -> None:
         )
         await runtime.coordinator.async_refresh()
 
+    async def install_pack(call) -> None:
+        runtime = _first_runtime(hass)
+        if runtime is None:
+            raise RuntimeError("Leassh is not configured")
+        await runtime.client.install_recipe_pack(
+            call.data["pack_id"],
+            call.data.get("target"),
+            call.data.get("fleet", "local"),
+        )
+        await runtime.coordinator.async_refresh()
+
+    async def uninstall_pack(call) -> None:
+        runtime = _first_runtime(hass)
+        if runtime is None:
+            raise RuntimeError("Leassh is not configured")
+        await runtime.client.uninstall_recipe_pack(call.data["pack_id"])
+        await runtime.coordinator.async_refresh()
+
     async def set_protection_profile(call) -> None:
         runtime = _first_runtime(hass)
         if runtime is None:
@@ -158,6 +180,8 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN, "dry_run_recipe", dry_run_recipe, supports_response=SupportsResponse.ONLY
     )
+    hass.services.async_register(DOMAIN, "install_pack", install_pack)
+    hass.services.async_register(DOMAIN, "uninstall_pack", uninstall_pack)
     hass.services.async_register(
         DOMAIN, "set_protection_profile", set_protection_profile
     )

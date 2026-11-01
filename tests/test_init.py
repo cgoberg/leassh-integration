@@ -76,6 +76,14 @@ class FakeClient:
     async def deny_action(self, request_id, principal):
         self.calls.append(("deny", request_id, principal))
 
+    async def install_recipe_pack(self, pack_id, target=None, fleet="local"):
+        self.calls.append(("install_pack", pack_id, target, fleet))
+        return {"ok": True}
+
+    async def uninstall_recipe_pack(self, pack_id):
+        self.calls.append(("uninstall_pack", pack_id))
+        return {"ok": True}
+
 
 def make_entry(runtime=None) -> MockConfigEntry:
     entry = MockConfigEntry(
@@ -135,9 +143,20 @@ async def test_services_cover_all_control_plane_actions(hass) -> None:
     await hass.services.async_call(
         DOMAIN, "deny_action", {"request_id": "a1", "principal": "owner"}, blocking=True
     )
+    await hass.services.async_call(
+        DOMAIN,
+        "install_pack",
+        {"pack_id": "family", "target": "rig", "fleet": "local"},
+        blocking=True,
+    )
+    await hass.services.async_call(
+        DOMAIN, "uninstall_pack", {"pack_id": "family"}, blocking=True
+    )
     assert result["ok"] is True
     assert ("add", {"name": "rig", "host": "h", "ssh": "u@h"}) in client.calls
-    assert coordinator.refreshed == 8
+    assert coordinator.refreshed == 10
+    assert ("install_pack", "family", "rig", "local") in client.calls
+    assert ("uninstall_pack", "family") in client.calls
 
 
 async def test_services_without_runtime_raise(hass) -> None:

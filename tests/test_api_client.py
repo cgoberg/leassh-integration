@@ -95,6 +95,7 @@ async def test_read_and_action_methods_use_the_expected_paths() -> None:
     assert await api.list_recipes() == {"ok": True}
     assert await api.get_recipe("household.bedtime") == {"ok": True}
     assert await api.recipe_instances() == {"ok": True}
+    assert await api.list_recipe_packs() == {"ok": True}
     assert await api.capability_manifest() == {"ok": True}
     assert await api.get_pack_suggestions() == {"ok": True}
     assert await api.get_actions() == {"ok": True}
@@ -128,6 +129,8 @@ async def test_mutation_methods_send_expected_bodies() -> None:
     await api.set_recipe_enabled("inst", False)
     await api.dry_run_recipe("inst", "rig", 30)
     await api.recipe_status("inst")
+    await api.install_recipe_pack("family", "rig")
+    await api.uninstall_recipe_pack("family")
     await api.delete_recipe_instance("inst")
     await api.set_pack_enabled("gpu-nvidia", False)
     await api.reload_packs()
@@ -204,6 +207,9 @@ async def test_every_wrapper_raises_api_error_on_500() -> None:
         lambda: api.set_recipe_enabled("i", True),
         lambda: api.dry_run_recipe("i"),
         lambda: api.recipe_status("i"),
+        lambda: api.list_recipe_packs(),
+        lambda: api.install_recipe_pack("family"),
+        lambda: api.uninstall_recipe_pack("family"),
         lambda: api.capability_manifest(),
         lambda: api.get_pack_suggestions(),
         lambda: api.reload_packs(),
