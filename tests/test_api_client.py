@@ -91,7 +91,9 @@ async def test_read_and_action_methods_use_the_expected_paths() -> None:
     assert await api.setup_status() == {"ok": True}
     assert await api.setup_state() == {"ok": True}
     assert await api.list_nodes() == {"ok": True}
+    assert await api.list_sites() == {"ok": True}
     assert await api.list_recipes() == {"ok": True}
+    assert await api.get_recipe("household.bedtime") == {"ok": True}
     assert await api.recipe_instances() == {"ok": True}
     assert await api.capability_manifest() == {"ok": True}
     assert await api.get_pack_suggestions() == {"ok": True}
@@ -116,16 +118,28 @@ async def test_mutation_methods_send_expected_bodies() -> None:
     await api.remove_node("rig")
     await api.test_node("rig")
     await api.install_recipe("household.bedtime")
-    await api.create_recipe_instance("household.bedtime", {"node": "rig"}, True)
-    await api.update_recipe_instance("inst", parameters={"grace": "60s"}, enabled=False)
+    await api.create_recipe_instance(
+        "household.bedtime", {"node": "rig"}, True, "Bedtime rig"
+    )
+    await api.update_recipe_instance(
+        "inst", parameters={"grace": "60s"}, enabled=False, display_name="Bedtime rig"
+    )
     await api.set_recipe_enabled("inst", True)
     await api.set_recipe_enabled("inst", False)
     await api.dry_run_recipe("inst", "rig", 30)
     await api.recipe_status("inst")
+    await api.delete_recipe_instance("inst")
     await api.set_pack_enabled("gpu-nvidia", False)
     await api.reload_packs()
     assert any(call[0] == "PATCH" for call in session.calls)
     assert any(call[0] == "DELETE" for call in session.calls)
+    create = next(
+        call for call in session.calls if call[1].endswith("/api/recipe-instances")
+        and call[0] == "POST"
+    )
+    assert create[2]["json"]["display_name"] == "Bedtime rig"
+    update = next(call for call in session.calls if call[0] == "PATCH")
+    assert update[2]["json"]["display_name"] == "Bedtime rig"
 
 
 async def test_304_returns_no_data() -> None:

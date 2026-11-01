@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.exceptions import HomeAssistantError
@@ -16,6 +17,7 @@ from custom_components.leassh.binary_sensor import (
 )
 from custom_components.leassh.button import (
     ActionButton,
+    RecipePreviewButton,
     async_setup_entry as button_setup,
     catalog_desc,
 )
@@ -25,7 +27,12 @@ from custom_components.leassh.sensor import (
     LeasshHubSensor,
     LeasshPackSuggestionsSensor,
     LeasshLicenseSensor,
+    RecipeStatusSensor,
     async_setup_entry as sensor_setup,
+)
+from custom_components.leassh.switch import (
+    RecipeEnabledSwitch,
+    async_setup_entry as switch_setup,
 )
 
 NODE = {
@@ -58,6 +65,11 @@ class FakeCoordinator:
         self.listeners = []
         self.recipe_instances = []
         self.approvals = {}
+        self.last_update_success = True
+        self.refreshes = 0
+
+    async def async_request_refresh(self):
+        self.refreshes += 1
 
     def async_add_listener(self, callback):
         self.listeners.append(callback)
@@ -355,3 +367,141 @@ async def test_hub_and_recipe_sensor_value_branches(hass) -> None:
     coordinator.recipe_instances = []
     assert recipe.native_value == "disabled"
     assert recipe.available is False
+
+
+RECIPE_RECORD = {
+    "instance": {
+        "id": "inst-1",
+        "recipe_id": "household.bedtime",
+        "target": "rig",
+        "enabled": True,
+    },
+    "display_name": "Bedtime rig",
+    "status": {},
+}
+
+
+async def test_recipe_switch_platform_and_toggle(hass) -> None:
+    runtime, coordinator = make_runtime([NODE])
+    entry = make_entry(runtime)
+    coordinator.recipe_instances = [RECIPE_RECORD, {"instance": {}}, RECIPE_RECORD]
+    added = []
+    await switch_setup(hass, entry, added.extend)
+    assert len(added) == 1
+    switch = added[0]
+    assert switch.entity_id == "switch.leassh_recipe_household_bedtime_enabled"
+    assert switch.unique_id == "entry1_recipe_inst-1_enabled"
+    assert switch.is_on is True
+    assert switch.available is True
+
+    calls = []
+
+    async def set_enabled(instance, enabled):
+        calls.append((instance, enabled))
+
+    runtime.client.set_recipe_enabled = set_enabled
+    await switch.async_turn_off()
+    await switch.async_turn_on()
+    assert calls == [("inst-1", False), ("inst-1", True)]
+    assert coordinator.refreshes == 2
+
+    async def fail(instance, enabled):
+        raise LeasshApiError("offline")
+
+    coordinator.recipe_instances = [{**RECIPE_RECORD, "display_name": "Renamed"}]
+    assert switch.name == "Renamed enabled"
+
+    runtime.client.set_recipe_enabled = fail
+    with pytest.raises(HomeAssistantError):
+        await switch.async_turn_off()
+
+    coordinator.recipe_instances = []
+    assert switch.available is False
+
+
+async def test_recipe_preview_button_notifies_and_errors(hass) -> None:
+    runtime, coordinator = make_runtime([NODE])
+    entry = make_entry(runtime)
+    coordinator.recipe_instances = [RECIPE_RECORD, {"instance": {}}, RECIPE_RECORD]
+
+    async def get_actions():
+        return {"verbs": []}
+
+    runtime.client.get_actions = get_actions
+    added = []
+    await button_setup(hass, entry, added.extend)
+    preview = next(item for item in added if isinstance(item, RecipePreviewButton))
+    assert preview.entity_id == "button.leassh_recipe_household_bedtime_preview"
+    assert preview.unique_id == "entry1_recipe_inst-1_preview"
+
+    async def dry_run(instance, node=None, idle_minutes=15):
+        return {
+            "summary": "Warn then log off",
+            "eligible": True,
+            "reasons": [],
+            "steps": [
+                {
+                    "action": "session.warn",
+                    "preview": {"expected_effect": "Warn the session"},
+                }
+            ],
+        }
+
+    runtime.client.dry_run_recipe = dry_run
+    preview.hass = hass
+    with patch.object(
+        type(hass.services), "async_call", new=AsyncMock()
+    ) as service_call, patch.object(type(hass.bus), "async_fire") as fire:
+        await preview.async_press()
+    assert service_call.called
+    args = service_call.call_args
+    assert args.args[0] == "persistent_notification"
+    assert "Warn then log off" in args.args[2]["message"]
+    assert fire.called
+
+    async def fail(instance, node=None, idle_minutes=15):
+        raise LeasshApiError("offline")
+
+    coordinator.recipe_instances = [{**RECIPE_RECORD, "display_name": "Renamed"}]
+    assert preview.name == "Renamed preview"
+
+    runtime.client.dry_run_recipe = fail
+    with pytest.raises(HomeAssistantError):
+        await preview.async_press()
+
+    coordinator.recipe_instances = []
+    assert preview.available is False
+
+
+async def test_recipe_sensor_slug_suffix_for_duplicates(hass) -> None:
+    runtime, coordinator = make_runtime([NODE])
+    entry = make_entry(runtime)
+    coordinator.recipe_instances = [
+        {
+            "instance": {
+                "id": "inst-1",
+                "recipe_id": "household.bedtime",
+                "target": "rig",
+                "enabled": True,
+            },
+            "display_name": "Bedtime rig",
+            "status": {},
+        },
+        {
+            "instance": {
+                "id": "inst-2",
+                "recipe_id": "household.bedtime",
+                "target": "laptop",
+                "enabled": False,
+            },
+            "display_name": "Bedtime laptop",
+            "status": {},
+        },
+    ]
+    added = []
+    await sensor_setup(hass, entry, added.extend)
+    sensors = [item for item in added if isinstance(item, RecipeStatusSensor)]
+    assert {item.entity_id for item in sensors} == {
+        "sensor.leassh_recipe_household_bedtime",
+        "sensor.leassh_recipe_household_bedtime_2",
+    }

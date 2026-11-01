@@ -43,12 +43,14 @@
   "options": {
     "step": {
       "init": {
-        "description": "Configure notifications, add a node, choose the protection profile, or manage recipes.",
+        "description": "Add and manage automations, install recipe bundles, configure notifications, add a node, or choose the protection profile.",
         "menu_options": {
+          "add_automation": "Add automation",
+          "manage_automations": "Manage automations",
+          "install_bundle": "Install bundle",
           "notify": "Notifications",
           "add_node": "Add a node",
-          "protection": "Protection profile",
-          "recipes": "Recipes"
+          "protection": "Protection profile"
         },
         "data": {
           "notify_targets": "Companion-app notify targets (comma-separated notify service names)"
@@ -77,10 +79,65 @@
           "confirmation": "Type UNRESTRICTED to confirm"
         }
       },
-      "recipes": {
-        "description": "Install a first-party recipe by id, or leave empty to just refresh.",
+      "add_automation": {
+        "description": "Choose a template. {count} templates are available.",
         "data": {
-          "recipe_id": "Recipe id (optional)"
+          "recipe_id": "Template"
+        }
+      },
+      "add_automation_target": {
+        "description": "Choose where {recipe} applies.",
+        "data": {
+          "target": "Applies to"
+        }
+      },
+      "add_automation_settings": {
+        "description": "Configure {recipe} for {target}. Defaults are filled in; advanced fields are optional."
+      },
+      "add_automation_review": {
+        "description": "{summary}\n\nParameters: {parameters}\n\nThe automation is created paused so you can preview it first.",
+        "data": {
+          "display_name": "Name (optional)"
+        }
+      },
+      "add_automation_preview": {
+        "description": "{summary}\n\nLeave this paused until the preview looks right.",
+        "data": {
+          "enable_now": "Enable after preview"
+        }
+      },
+      "manage_automations": {
+        "description": "Choose an automation to manage.",
+        "data": {
+          "instance": "Automation"
+        }
+      },
+      "manage_automation_action": {
+        "menu_options": {
+          "enable_automation": "Enable",
+          "disable_automation": "Disable",
+          "preview_automation": "Preview",
+          "edit_automation": "Edit settings",
+          "delete_automation": "Delete",
+          "back_to_automations": "Back"
+        }
+      },
+      "preview_automation": {
+        "description": "{summary}",
+        "data": {
+          "done": "Done"
+        }
+      },
+      "delete_automation": {
+        "description": "Delete {instance}? This cannot be undone.",
+        "data": {
+          "confirm": "Confirm delete"
+        }
+      },
+      "install_bundle": {
+        "description": "Install every recipe in a first-party bundle.",
+        "data": {
+          "bundle": "Bundle"
         }
       }
     },
@@ -88,7 +145,25 @@
       "cannot_add_node": "The server rejected the node. Check the name, host and SSH target.",
       "invalid_profile": "The protection profile change was rejected. Unrestricted requires the typed confirmation.",
       "recipe_install_failed": "The server rejected the recipe install.",
-      "invalid_auth": "The server rejected the token."
+      "invalid_auth": "The server rejected the token.",
+      "automation_create_failed": "The server rejected the new automation.",
+      "automation_save_failed": "The server rejected the automation change.",
+      "automation_enable_failed": "The automation was created but could not be enabled.",
+      "automation_delete_failed": "The server rejected the delete.",
+      "confirm_delete": "Tick the confirmation box to delete.",
+      "unknown_bundle": "That bundle is no longer available.",
+      "no_targets": "No targets are available for this template."
+    },
+    "abort": {
+      "cannot_load_recipes": "Could not load the recipe catalog.",
+      "no_templates": "No recipe templates are installed.",
+      "cannot_load_targets": "Could not load nodes or sites.",
+      "cannot_load_automations": "Could not load automations.",
+      "no_automations": "No automations exist yet.",
+      "automation_not_created": "The automation was not created.",
+      "automation_not_found": "The automation could not be found.",
+      "automation_update_failed": "The automation could not be updated.",
+      "no_bundles": "No recipe bundles are available."
     }
   },
   "entity": {
@@ -340,6 +415,12 @@
   "exceptions": {
     "action_failed": {
       "message": "Leassh action {action} on {node} failed: {error}"
+    },
+    "automation_preview_failed": {
+      "message": "Leassh preview for {automation} failed: {error}"
+    },
+    "automation_toggle_failed": {
+      "message": "Leassh could not change {automation}: {error}"
     }
   }
 }

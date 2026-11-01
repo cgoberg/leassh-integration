@@ -477,6 +477,7 @@ async def test_recipe_status_sensor_exposes_why_and_next_run(hass) -> None:
                     "recipe_version": "1.0.0",
                     "scope": "node",
                     "target": "192.168.1.131",
+                    "display_name": "Bedtime rig",
                     "enabled": True,
                     "status": "active",
                     "last_run_at": "2026-11-01T20:00:00Z",
@@ -502,12 +503,17 @@ async def test_recipe_status_sensor_exposes_why_and_next_run(hass) -> None:
     )
     assert sensor.unique_id == "entry1_recipe_inst-1"
     assert sensor.entity_id == "sensor.leassh_recipe_household_bedtime"
+    assert sensor.name == "Bedtime rig"
     assert sensor.native_value == "active"
     attrs = sensor.extra_state_attributes
     assert attrs["recipe_id"] == "household.bedtime"
+    assert attrs["display_name"] == "Bedtime rig"
     assert attrs["next_run_at"] == "2026-11-02T20:00:00Z"
     assert attrs["pending_actions"] == 0
     assert attrs["jobs"][0]["trigger_id"] == "quiet-hours"
+
+    coordinator.recipe_instances[0]["display_name"] = "Renamed bedtime"
+    assert sensor.name == "Renamed bedtime"
 
     coordinator.recipe_instances[0]["instance"]["last_error"] = "missing provider"
     assert sensor.native_value == "error"

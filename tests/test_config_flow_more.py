@@ -82,33 +82,287 @@ async def test_options_notify_targets(hass) -> None:
     assert result["data"][CONF_NOTIFY_TARGETS] == ["mobile_app_a", "mobile_app_b"]
 
 
-async def test_options_recipes_install_and_refresh(hass) -> None:
+CATALOG = {
+    "catalog": [
+        {
+            "id": "household.bedtime",
+            "name": "Bedtime",
+            "bundle": "family",
+            "scope": "node",
+            "destructive": True,
+            "description": "Quiet hours and session enforcement per device.",
+        }
+    ],
+    "installed": [],
+    "bundles": [{"id": "family", "recipes": ["household.bedtime"]}],
+    "instances": [],
+}
+
+MANIFEST = {
+    "id": "household.bedtime",
+    "name": "Bedtime",
+    "scope": "node",
+    "parameters": {
+        "node": {"type": "node", "required": True},
+        "quiet_hours": {"type": "schedule", "default": "21:00-07:00"},
+        "grace": {"type": "duration", "default": "5m", "description": "How long to wait before sign-out."},
+        "enabled": {"type": "boolean", "default": True},
+        "categories": {
+            "type": "multi_select",
+            "options": ["games", "video"],
+            "default": ["games"],
+        },
+        "daily_limit_minutes": {
+            "type": "number",
+            "default": 120,
+            "min": 15,
+            "max": 1440,
+        },
+        "message": {"type": "text", "default": "Bedtime soon"},
+        "meter": {"type": "select", "options": ["screen_time"], "default": "screen_time"},
+        "digest_time": {"type": "time", "default": "20:00"},
+    },
+}
+
+INSTANCES = {
+    "instances": [
+        {
+            "instance": {
+                "id": "inst-1",
+                "recipe_id": "household.bedtime",
+                "target": "rig",
+                "parameters": {"node": "rig", "grace": "5m"},
+                "enabled": True,
+            },
+            "display_name": "Bedtime rig",
+            "status": {"recent_events": []},
+        }
+    ]
+}
+
+
+SITE_MANIFEST = {
+    "id": "household.site-test",
+    "name": "Site test",
+    "scope": "site",
+    "parameters": {
+        "site": {"type": "site", "required": True},
+        "enabled": {"type": "boolean", "default": True},
+    },
+}
+
+FLEET_MANIFEST = {
+    "id": "household.fleet-test",
+    "name": "Fleet test",
+    "scope": "fleet",
+    "parameters": {
+        "fleet": {"type": "fleet", "default": "local"},
+        "enabled": {"type": "boolean", "default": True},
+    },
+}
+
+SCOPED_CATALOG = {
+    "catalog": [
+        {
+            "id": "household.site-test",
+            "name": "Site test",
+            "bundle": "family",
+            "scope": "site",
+            "destructive": False,
+            "description": "A site-scoped test.",
+        },
+        {
+            "id": "household.fleet-test",
+            "name": "Fleet test",
+            "bundle": "family",
+            "scope": "fleet",
+            "destructive": False,
+            "description": "A fleet-scoped test.",
+        },
+    ],
+    "installed": [
+        {"id": "household.site-test"},
+        {"id": "household.fleet-test"},
+    ],
+    "bundles": [{"id": "family", "recipes": ["household.site-test", "household.fleet-test"]}],
+    "instances": [],
+}
+
+
+async def test_options_add_automation_wizard(hass) -> None:
+    cfg = entry()
+    cfg.add_to_hass(hass)
+    calls = {}
+
+    async def listing(self):
+        return CATALOG
+
+    async def install(self, recipe_id):
+        calls["installed"] = recipe_id
+        return {"ok": True}
+
+    async def get_recipe(self, recipe_id):
+        return {"manifest": MANIFEST}
+
+    async def nodes(self):
+        return {"nodes": [{"name": "rig"}]}
+
+    async def sites(self):
+        return {"sites": {}}
+
+    async def create(self, recipe_id, parameters, enabled, display_name=None):
+        calls.update(
+            recipe_id=recipe_id,
+            parameters=parameters,
+            created_enabled=enabled,
+            display_name=display_name,
+        )
+        return {
+            "instance": {
+                "id": "inst-1",
+                "recipe_id": recipe_id,
+                "parameters": parameters,
+                "enabled": enabled,
+                "display_name": display_name,
+            }
+        }
+
+    async def dry_run(self, instance, node=None, idle_minutes=15):
+        calls["preview"] = (instance, node)
+        return {
+            "summary": "Warn then log off",
+            "eligible": True,
+            "reasons": [],
+            "steps": [
+                {
+                    "action": "session.warn",
+                    "preview": {
+                        "expected_effect": "Warn the session",
+                        "risk": "T1",
+                        "requires_approval": False,
+                    },
+                }
+            ],
+        }
+
+    async def enable(self, instance, enabled):
+        calls["enabled"] = (instance, enabled)
+        return {"ok": True}
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=listing,
+        install_recipe=install,
+        get_recipe=get_recipe,
+        list_nodes=nodes,
+        list_sites=sites,
+        create_recipe_instance=create,
+        dry_run_recipe=dry_run,
+        set_recipe_enabled=enable,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+        assert result["step_id"] == "add_automation"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"recipe_id": "household.bedtime"}
+        )
+        assert result["step_id"] == "add_automation_target"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"target": "rig"}
+        )
+        assert result["step_id"] == "add_automation_settings"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                "quiet_hours": "22:00-06:00",
+                "grace": "10m",
+                "enabled": False,
+                "categories": ["games", "video"],
+                "daily_limit_minutes": 90,
+                "message": "Go to bed",
+                "meter": "screen_time",
+                "digest_time": "20:30",
+            },
+        )
+        assert result["step_id"] == "add_automation_review"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"display_name": "Bedtime rig"}
+        )
+        assert result["step_id"] == "add_automation_preview"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"enable_now": True}
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert calls["installed"] == "household.bedtime"
+    assert calls["recipe_id"] == "household.bedtime"
+    assert calls["parameters"]["node"] == "rig"
+    assert calls["parameters"]["categories"] == ["games", "video"]
+    assert calls["created_enabled"] is False
+    assert calls["display_name"] == "Bedtime rig"
+    assert calls["preview"] == ("inst-1", "rig")
+    assert calls["enabled"] == ("inst-1", True)
+
+
+async def test_options_install_bundle(hass) -> None:
     cfg = entry()
     cfg.add_to_hass(hass)
     calls = []
+
+    async def listing(self):
+        return CATALOG
 
     async def install(self, recipe_id):
         calls.append(recipe_id)
         return {"ok": True}
 
-    async def listing(self):
-        return {"catalog": []}
-
-    with patch(
-        "custom_components.leassh.api.LeasshClient.install_recipe", new=install
-    ), patch(
-        "custom_components.leassh.api.LeasshClient.list_recipes", new=listing
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=listing,
+        install_recipe=install,
     ):
         result = await hass.config_entries.options.async_init(cfg.entry_id)
         result = await hass.config_entries.options.async_configure(
-            result["flow_id"], {"next_step_id": "recipes"}
+            result["flow_id"], {"next_step_id": "install_bundle"}
         )
         result = await hass.config_entries.options.async_configure(
-            result["flow_id"], {"recipe_id": "household.bedtime"}
+            result["flow_id"], {"bundle": "family"}
         )
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     assert calls == ["household.bedtime"]
 
+
+async def test_options_add_automation_aborts(hass) -> None:
+    cfg = entry()
+    cfg.add_to_hass(hass)
+
+    async def empty(self):
+        return {"catalog": [], "installed": [], "bundles": []}
+
+    with patch(
+        "custom_components.leassh.api.LeasshClient.list_recipes", new=empty
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "no_templates"
+
+    async def broken(self):
+        raise LeasshApiError("offline")
+
+    with patch(
+        "custom_components.leassh.api.LeasshClient.list_recipes", new=broken
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "cannot_load_recipes"
 
 async def test_options_add_node_and_profile_errors(hass) -> None:
     cfg = entry()
@@ -147,24 +401,172 @@ async def test_options_add_node_and_profile_errors(hass) -> None:
         assert result["errors"]["base"] == "invalid_profile"
 
 
-async def test_options_recipe_install_error(hass) -> None:
+async def test_options_manage_automations_actions(hass) -> None:
+    cfg = entry()
+    cfg.add_to_hass(hass)
+    calls = {}
+
+    async def instances(self):
+        return INSTANCES
+
+    async def get_recipe(self, recipe_id):
+        return {"manifest": MANIFEST}
+
+    async def enable(self, instance, enabled):
+        calls["enabled"] = (instance, enabled)
+        return {"ok": True}
+
+    async def dry_run(self, instance, node=None, idle_minutes=15):
+        calls["preview"] = (instance, node)
+        return {
+            "summary": "Warn then log off",
+            "eligible": True,
+            "reasons": [],
+            "steps": [],
+        }
+
+    async def update(self, instance, parameters=None, enabled=None, display_name=None):
+        calls["updated"] = (instance, parameters, enabled, display_name)
+        return {"instance": {"id": instance}}
+
+    async def delete(self, instance):
+        calls["deleted"] = instance
+        return {"ok": True}
+
+    patches = patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        recipe_instances=instances,
+        get_recipe=get_recipe,
+        set_recipe_enabled=enable,
+        dry_run_recipe=dry_run,
+        update_recipe_instance=update,
+        delete_recipe_instance=delete,
+    )
+    with patches:
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "manage_automations"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"instance": "inst-1"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "enable_automation"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+        assert calls["enabled"] == ("inst-1", True)
+
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "manage_automations"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"instance": "inst-1"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "preview_automation"}
+        )
+        assert result["step_id"] == "preview_automation"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"done": True}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+        assert calls["preview"] == ("inst-1", "rig")
+
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "manage_automations"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"instance": "inst-1"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "edit_automation"}
+        )
+        assert result["step_id"] == "add_automation_settings"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {}
+        )
+        assert result["step_id"] == "add_automation_review"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"display_name": "Quiet hours rig"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+        assert calls["updated"][0] == "inst-1"
+        assert calls["updated"][3] == "Quiet hours rig"
+
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "manage_automations"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"instance": "inst-1"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "delete_automation"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"confirm": True}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+        assert calls["deleted"] == "inst-1"
+
+
+async def test_options_install_bundle_error(hass) -> None:
     cfg = entry()
     cfg.add_to_hass(hass)
 
-    async def bad(self, recipe_id):
-        raise LeasshApiError("bad recipe")
+    async def listing(self):
+        return CATALOG
 
-    with patch(
-        "custom_components.leassh.api.LeasshClient.install_recipe", new=bad
+    async def install(self, recipe_id):
+        raise LeasshApiError("bad bundle")
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=listing,
+        install_recipe=install,
     ):
         result = await hass.config_entries.options.async_init(cfg.entry_id)
         result = await hass.config_entries.options.async_configure(
-            result["flow_id"], {"next_step_id": "recipes"}
+            result["flow_id"], {"next_step_id": "install_bundle"}
         )
         result = await hass.config_entries.options.async_configure(
-            result["flow_id"], {"recipe_id": "missing.recipe"}
+            result["flow_id"], {"bundle": "family"}
         )
-        assert result["errors"]["base"] == "recipe_install_failed"
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["errors"]["base"] == "recipe_install_failed"
+
+
+async def test_options_manage_automations_aborts(hass) -> None:
+    cfg = entry()
+    cfg.add_to_hass(hass)
+
+    async def empty(self):
+        return {"instances": []}
+
+    with patch(
+        "custom_components.leassh.api.LeasshClient.recipe_instances", new=empty
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "manage_automations"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "no_automations"
+
+    async def broken(self):
+        raise LeasshApiError("offline")
+
+    with patch(
+        "custom_components.leassh.api.LeasshClient.recipe_instances", new=broken
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "manage_automations"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "cannot_load_automations"
 
 
 async def test_reconfigure_rejects_bad_token_and_connection(hass) -> None:
@@ -288,23 +690,673 @@ async def test_options_auth_error_and_empty_recipe(hass) -> None:
         )
         assert result["errors"]["base"] == "invalid_auth"
 
-    with patch(
-        "custom_components.leassh.api.LeasshClient.install_recipe", new=auth_error
+    async def listing(self):
+        return CATALOG
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=listing,
+        install_recipe=auth_error,
     ):
         result = await hass.config_entries.options.async_init(cfg.entry_id)
         result = await hass.config_entries.options.async_configure(
-            result["flow_id"], {"next_step_id": "recipes"}
+            result["flow_id"], {"next_step_id": "install_bundle"}
         )
         result = await hass.config_entries.options.async_configure(
-            result["flow_id"], {"recipe_id": "x"}
+            result["flow_id"], {"bundle": "family"}
         )
         assert result["errors"]["base"] == "invalid_auth"
 
-    result = await hass.config_entries.options.async_init(cfg.entry_id)
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"next_step_id": "recipes"}
-    )
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"recipe_id": ""}
-    )
+
+async def test_options_add_automation_site_and_fleet_scopes(hass) -> None:
+    cfg = entry()
+    cfg.add_to_hass(hass)
+    created = []
+
+    async def listing(self):
+        return SCOPED_CATALOG
+
+    async def get_recipe(self, recipe_id):
+        return {
+            "manifest": SITE_MANIFEST
+            if recipe_id == "household.site-test"
+            else FLEET_MANIFEST
+        }
+
+    async def nodes(self):
+        return {"nodes": [{"name": "rig"}]}
+
+    async def sites(self):
+        return {"sites": {"home": ["rig"]}}
+
+    async def create(self, recipe_id, parameters, enabled, display_name=None):
+        created.append((recipe_id, parameters, enabled, display_name))
+        return {"instance": {"id": f"inst-{len(created)}"}}
+
+    async def dry_run(self, instance, node=None, idle_minutes=15):
+        return {"summary": "ok", "eligible": True, "reasons": [], "steps": []}
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=listing,
+        get_recipe=get_recipe,
+        list_nodes=nodes,
+        list_sites=sites,
+        create_recipe_instance=create,
+        dry_run_recipe=dry_run,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"recipe_id": "household.site-test"}
+        )
+        assert result["step_id"] == "add_automation_target"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"target": "home"}
+        )
+        assert result["step_id"] == "add_automation_settings"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"enabled": True}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"enable_now": False}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"recipe_id": "household.fleet-test"}
+        )
+        assert result["step_id"] == "add_automation_target"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"target": "local"}
+        )
+        assert result["step_id"] == "add_automation_settings"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"enabled": True}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"enable_now": False}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+
+    assert created[0][1]["site"] == "home"
+    assert created[1][1]["fleet"] == "local"
+
+
+async def test_options_add_automation_errors(hass) -> None:
+    cfg = entry()
+    cfg.add_to_hass(hass)
+
+    async def listing(self):
+        return CATALOG
+
+    async def installed_listing(self):
+        return {**CATALOG, "installed": [{"id": "household.bedtime"}]}
+
+    async def bad_recipe(self, recipe_id):
+        raise LeasshApiError("bad manifest")
+
+    async def nodes(self):
+        return {"nodes": [{"name": "rig"}]}
+
+    async def sites(self):
+        return {"sites": {}}
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=installed_listing,
+        get_recipe=bad_recipe,
+        list_nodes=nodes,
+        list_sites=sites,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"recipe_id": "household.bedtime"}
+        )
+    assert result["errors"]["base"] == "recipe_install_failed"
+
+    async def good_recipe(self, recipe_id):
+        return {"manifest": MANIFEST}
+
+    async def bad_create(self, recipe_id, parameters, enabled, display_name=None):
+        raise LeasshApiError("bad create")
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=installed_listing,
+        get_recipe=good_recipe,
+        list_nodes=nodes,
+        list_sites=sites,
+        create_recipe_instance=bad_create,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"recipe_id": "household.bedtime"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"target": "rig"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"display_name": "Bedtime rig"}
+        )
+    assert result["errors"]["base"] == "automation_create_failed"
+
+    async def bad_preview(self, instance, node=None, idle_minutes=15):
+        raise LeasshApiError("bad preview")
+
+    async def bad_enable(self, instance, enabled):
+        raise LeasshApiError("bad enable")
+
+    async def create(self, recipe_id, parameters, enabled, display_name=None):
+        return {"instance": {"id": "inst-1"}}
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=installed_listing,
+        get_recipe=good_recipe,
+        list_nodes=nodes,
+        list_sites=sites,
+        create_recipe_instance=create,
+        dry_run_recipe=bad_preview,
+        set_recipe_enabled=bad_enable,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"recipe_id": "household.bedtime"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"target": "rig"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"display_name": "Bedtime rig"}
+        )
+        assert result["step_id"] == "add_automation_preview"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"enable_now": True}
+        )
+    assert result["errors"]["base"] == "automation_enable_failed"
+
+
+async def test_options_manage_disable_delete_back(hass) -> None:
+    cfg = entry()
+    cfg.add_to_hass(hass)
+    calls = []
+
+    async def instances(self):
+        return INSTANCES
+
+    async def enable(self, instance, enabled):
+        calls.append(("enabled", instance, enabled))
+
+    async def delete(self, instance):
+        calls.append(("deleted", instance))
+        raise LeasshApiError("cannot delete")
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        recipe_instances=instances,
+        set_recipe_enabled=enable,
+        delete_recipe_instance=delete,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "manage_automations"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"instance": "inst-1"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "disable_automation"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+        assert calls[-1] == ("enabled", "inst-1", False)
+
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "manage_automations"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"instance": "inst-1"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "back_to_automations"}
+        )
+        assert result["step_id"] == "manage_automations"
+
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "manage_automations"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"instance": "inst-1"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "delete_automation"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"confirm": False}
+        )
+        assert result["errors"]["base"] == "confirm_delete"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"confirm": True}
+        )
+    assert result["errors"]["base"] == "automation_delete_failed"
+
+
+TARGET_ONLY_MANIFEST = {
+    "id": "household.target-only",
+    "name": "Target only",
+    "scope": "node",
+    "parameters": {"node": {"type": "node", "required": True}},
+}
+
+TARGET_ONLY_CATALOG = {
+    "catalog": [
+        {
+            "id": "household.target-only",
+            "name": "Target only",
+            "bundle": "family",
+            "scope": "node",
+            "destructive": False,
+            "description": "No settings beyond the target.",
+        }
+    ],
+    "installed": [{"id": "household.target-only"}],
+    "bundles": [],
+    "instances": [],
+}
+
+
+async def test_options_add_automation_target_errors(hass) -> None:
+    cfg = entry()
+    cfg.add_to_hass(hass)
+
+    async def listing(self):
+        return {**CATALOG, "installed": [{"id": "household.bedtime"}]}
+
+    async def get_recipe(self, recipe_id):
+        return {"manifest": MANIFEST}
+
+    async def empty_nodes(self):
+        return {"nodes": []}
+
+    async def broken_nodes(self):
+        raise LeasshApiError("offline")
+
+    async def sites(self):
+        return {"sites": {}}
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=listing,
+        get_recipe=get_recipe,
+        list_nodes=empty_nodes,
+        list_sites=sites,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"recipe_id": "household.bedtime"}
+        )
+    assert result["step_id"] == "add_automation_target"
+    assert result["errors"]["base"] == "no_targets"
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=listing,
+        get_recipe=get_recipe,
+        list_nodes=broken_nodes,
+        list_sites=sites,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"recipe_id": "household.bedtime"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "cannot_load_targets"
+
+
+async def test_options_add_automation_auth_errors(hass) -> None:
+    cfg = entry()
+    cfg.add_to_hass(hass)
+
+    async def listing(self):
+        return {**CATALOG, "installed": [{"id": "household.bedtime"}]}
+
+    async def auth_error(self, *args, **kwargs):
+        raise LeasshAuthError("401")
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=listing,
+        get_recipe=auth_error,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"recipe_id": "household.bedtime"}
+        )
+    assert result["errors"]["base"] == "invalid_auth"
+
+    async def get_recipe(self, recipe_id):
+        return {"manifest": MANIFEST}
+
+    async def nodes(self):
+        return {"nodes": [{"name": "rig"}]}
+
+    async def sites(self):
+        return {"sites": {}}
+
+    async def create(self, *args, **kwargs):
+        raise LeasshAuthError("401")
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=listing,
+        get_recipe=get_recipe,
+        list_nodes=nodes,
+        list_sites=sites,
+        create_recipe_instance=create,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"recipe_id": "household.bedtime"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"target": "rig"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"display_name": "Bedtime rig"}
+        )
+    assert result["errors"]["base"] == "invalid_auth"
+
+
+async def test_options_add_automation_preview_text(hass) -> None:
+    cfg = entry()
+    cfg.add_to_hass(hass)
+
+    async def listing(self):
+        return {**CATALOG, "installed": [{"id": "household.bedtime"}]}
+
+    async def get_recipe(self, recipe_id):
+        return {"manifest": MANIFEST}
+
+    async def nodes(self):
+        return {"nodes": [{"name": "rig"}]}
+
+    async def sites(self):
+        return {"sites": {}}
+
+    async def create(self, recipe_id, parameters, enabled, display_name=None):
+        return {"instance": {"id": "inst-1"}}
+
+    async def preview(self, instance, node=None, idle_minutes=15):
+        return {
+            "summary": "Warn then log off",
+            "eligible": False,
+            "reasons": ["not signed in"],
+            "steps": [
+                {
+                    "action": "session.warn",
+                    "after_seconds": 300,
+                    "preview": {"expected_effect": "Warn the session"},
+                },
+                "not-a-dict",
+            ],
+        }
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=listing,
+        get_recipe=get_recipe,
+        list_nodes=nodes,
+        list_sites=sites,
+        create_recipe_instance=create,
+        dry_run_recipe=preview,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"recipe_id": "household.bedtime"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"target": "rig"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"display_name": "Bedtime rig"}
+        )
+        assert result["step_id"] == "add_automation_preview"
+        description = result["description_placeholders"]["summary"]
+        assert "Would not run" in description
+        assert "after 300s" in description
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"enable_now": False}
+        )
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+
+
+async def test_options_add_automation_without_settings(hass) -> None:
+    cfg = entry()
+    cfg.add_to_hass(hass)
+
+    async def listing(self):
+        return TARGET_ONLY_CATALOG
+
+    async def get_recipe(self, recipe_id):
+        return {"manifest": TARGET_ONLY_MANIFEST}
+
+    async def nodes(self):
+        return {"nodes": [{"name": "rig"}]}
+
+    async def sites(self):
+        return {"sites": {}}
+
+    async def create(self, recipe_id, parameters, enabled, display_name=None):
+        return {"instance": {"id": "inst-1"}}
+
+    async def preview(self, instance, node=None, idle_minutes=15):
+        return {"summary": "ok", "eligible": True, "reasons": [], "steps": []}
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        list_recipes=listing,
+        get_recipe=get_recipe,
+        list_nodes=nodes,
+        list_sites=sites,
+        create_recipe_instance=create,
+        dry_run_recipe=preview,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_automation"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"recipe_id": "household.target-only"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"target": "rig"}
+        )
+        assert result["step_id"] == "add_automation_review"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"display_name": "Target only"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"enable_now": False}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+
+
+async def test_options_manage_edit_and_preview_errors(hass) -> None:
+    cfg = entry()
+    cfg.add_to_hass(hass)
+
+    calls = {"instances": 0}
+
+    async def empty_second(self):
+        calls["instances"] += 1
+        if calls["instances"] <= 2:
+            return INSTANCES
+        return {"instances": []}
+
+    with patch(
+        "custom_components.leassh.api.LeasshClient.recipe_instances",
+        new=empty_second,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "manage_automations"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"instance": "inst-1"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "edit_automation"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "automation_not_found"
+
+    async def instances(self):
+        return INSTANCES
+
+    async def broken_recipe(self, recipe_id):
+        raise LeasshApiError("offline")
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        recipe_instances=instances,
+        get_recipe=broken_recipe,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "manage_automations"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"instance": "inst-1"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "edit_automation"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "automation_not_found"
+
+    async def broken_preview(self, instance, node=None, idle_minutes=15):
+        raise LeasshApiError("offline")
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        recipe_instances=instances,
+        dry_run_recipe=broken_preview,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "manage_automations"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"instance": "inst-1"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "preview_automation"}
+        )
+        assert result["step_id"] == "preview_automation"
+        assert "offline" in result["description_placeholders"]["summary"]
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"done": True}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+
+    async def broken_enable(self, instance, enabled):
+        raise LeasshApiError("offline")
+
+    with patch.multiple(
+        "custom_components.leassh.api.LeasshClient",
+        recipe_instances=instances,
+        set_recipe_enabled=broken_enable,
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "manage_automations"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"instance": "inst-1"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "enable_automation"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "automation_update_failed"
+
+
+async def test_options_install_bundle_aborts(hass) -> None:
+    cfg = entry()
+    cfg.add_to_hass(hass)
+
+    async def broken(self):
+        raise LeasshApiError("offline")
+
+    with patch(
+        "custom_components.leassh.api.LeasshClient.list_recipes", new=broken
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "install_bundle"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "cannot_load_recipes"
+
+    async def empty(self):
+        return {"bundles": []}
+
+    with patch(
+        "custom_components.leassh.api.LeasshClient.list_recipes", new=empty
+    ):
+        result = await hass.config_entries.options.async_init(cfg.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "install_bundle"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "no_bundles"

@@ -61,6 +61,23 @@ def device_identifier(entry: ConfigEntry, host: str) -> str:
     return f"{entry.entry_id}_{host}"
 
 
+def recipe_slug(recipe_id: str) -> str:
+    """Stable entity-id fragment for one recipe id."""
+    return recipe_id.replace(".", "_").replace("-", "_")
+
+
+def recipe_display_name(record: dict) -> str:
+    """Friendly name for a recipe-instance record."""
+    instance = record.get("instance") or {}
+    return str(
+        record.get("display_name")
+        or instance.get("display_name")
+        or instance.get("recipe_id")
+        or instance.get("id")
+        or "Automation"
+    )
+
+
 def entity_unique_id(
     entry: ConfigEntry, host: str, metric: str, series_key: str | None = None
 ) -> str:

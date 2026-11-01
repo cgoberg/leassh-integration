@@ -39,6 +39,8 @@ from .entity import (
     node_device,
     node_host,
     node_provenance,
+    recipe_display_name,
+    recipe_slug,
 )
 
 PARALLEL_UPDATES = 0
@@ -212,6 +214,7 @@ async def async_setup_entry(
     entry.async_on_unload(coordinator.async_add_listener(add_node_sensors))
 
     recipe_seen: set[str] = set()
+    recipe_slugs: dict[str, int] = {}
 
     def add_recipe_sensors() -> None:
         new: list[SensorEntity] = []
@@ -221,7 +224,11 @@ async def async_setup_entry(
             if not instance_id or instance_id in recipe_seen:
                 continue
             recipe_seen.add(instance_id)
-            new.append(RecipeStatusSensor(entry, runtime, record))
+            base = "leassh_recipe_" + recipe_slug(str(instance.get("recipe_id") or instance_id))
+            count = recipe_slugs.get(base, 0) + 1
+            recipe_slugs[base] = count
+            slug = base if count == 1 else f"{base}_{count}"
+            new.append(RecipeStatusSensor(entry, runtime, record, slug))
         if new:
             async_add_entities(new)
 
@@ -763,7 +770,7 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
 class RecipeStatusSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
     """One recipe instance: enabled/disabled/error plus why and next run."""
 
-    _attr_has_entity_name = True
+    _attr_has_entity_name = False
     _attr_icon = "mdi:book-cog-outline"
 
     def __init__(
@@ -771,6 +778,7 @@ class RecipeStatusSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
         entry: ConfigEntry,
         runtime: LeasshRuntime,
         record: dict[str, Any],
+        slug: str | None = None,
     ) -> None:
         super().__init__(runtime.coordinator)
         self._entry = entry
@@ -779,8 +787,13 @@ class RecipeStatusSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
         self._attr_device_info = hub_device(entry, runtime.client.base_url)
         instance = record.get("instance") or {}
         self._recipe_id = instance.get("recipe_id", self._instance_id)
-        self._attr_name = f"Recipe {self._recipe_id}"
-        self.entity_id = "sensor." + self.suggested_object_id
+        self._attr_name = recipe_display_name(record)
+        self.entity_id = "sensor." + (slug or self.suggested_object_id)
+
+    @property
+    def name(self) -> str:
+        """Follow the editable automation display name."""
+        return recipe_display_name(self._record())
 
     @property
     def suggested_object_id(self) -> str:
@@ -815,6 +828,12 @@ class RecipeStatusSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
         status = record.get("status") or {}
         return {
             "instance": self._instance_id,
+            "display_name": record.get("display_name")
+            or instance.get("display_name")
+            or self._attr_name,
+            "recipe_name": record.get("recipe_name"),
+            "target_name": record.get("target_name") or instance.get("target"),
+            "status_label": record.get("status_label"),
             "recipe_id": instance.get("recipe_id"),
             "recipe_version": instance.get("recipe_version"),
             "scope": instance.get("scope"),

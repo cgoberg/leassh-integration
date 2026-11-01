@@ -191,6 +191,13 @@ class LeasshClient:
                 raise LeasshApiError(f"/api/setup/nodes returned {resp.status}")
             return await resp.json()
 
+    async def list_sites(self) -> dict[str, Any]:
+        resp = await self._request("GET", "/api/setup/sites")
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/setup/sites returned {resp.status}")
+            return await resp.json()
+
     async def add_node(self, node: dict[str, Any]) -> dict[str, Any]:
         resp = await self._request("POST", "/api/setup/nodes", json=node)
         async with resp:
@@ -222,6 +229,13 @@ class LeasshClient:
                 raise LeasshApiError(f"/api/recipes returned {resp.status}")
             return await resp.json()
 
+    async def get_recipe(self, recipe_id: str) -> dict[str, Any]:
+        resp = await self._request("GET", f"/api/recipes/{recipe_id}")
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/recipes/{recipe_id} returned {resp.status}")
+            return await resp.json()
+
     async def install_recipe(self, recipe_id: str) -> dict[str, Any]:
         resp = await self._request(
             "POST", "/api/recipes/install", json={"id": recipe_id}
@@ -240,16 +254,23 @@ class LeasshClient:
             return await resp.json()
 
     async def create_recipe_instance(
-        self, recipe_id: str, parameters: dict[str, Any], enabled: bool
+        self,
+        recipe_id: str,
+        parameters: dict[str, Any],
+        enabled: bool,
+        display_name: str | None = None,
     ) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "recipe_id": recipe_id,
+            "parameters": parameters,
+            "enabled": enabled,
+        }
+        if display_name:
+            body["display_name"] = display_name
         resp = await self._request(
             "POST",
             "/api/recipe-instances",
-            json={
-                "recipe_id": recipe_id,
-                "parameters": parameters,
-                "enabled": enabled,
-            },
+            json=body,
         )
         async with resp:
             payload = await resp.json(content_type=None)
@@ -258,14 +279,19 @@ class LeasshClient:
             return payload
 
     async def update_recipe_instance(
-        self, instance: str, parameters: dict[str, Any] | None = None,
+        self,
+        instance: str,
+        parameters: dict[str, Any] | None = None,
         enabled: bool | None = None,
+        display_name: str | None = None,
     ) -> dict[str, Any]:
         body: dict[str, Any] = {}
         if parameters is not None:
             body["parameters"] = parameters
         if enabled is not None:
             body["enabled"] = enabled
+        if display_name is not None:
+            body["display_name"] = display_name
         resp = await self._request(
             "PATCH", f"/api/recipe-instances/{instance}", json=body
         )
@@ -284,6 +310,16 @@ class LeasshClient:
             payload = await resp.json(content_type=None)
             if resp.status != 200:
                 raise LeasshApiError(f"recipe {verb} failed: {payload}")
+            return payload
+
+    async def delete_recipe_instance(self, instance: str) -> dict[str, Any]:
+        resp = await self._request(
+            "DELETE", f"/api/recipe-instances/{instance}"
+        )
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"delete recipe instance failed: {payload}")
             return payload
 
     async def dry_run_recipe(
