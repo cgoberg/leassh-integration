@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from homeassistant.components.zeroconf import ZeroconfServiceInfo
 
 from .api import (
+    LeasshApiError,
     LeasshAuthError,
     LeasshClient,
     LeasshConnectionError,
@@ -210,21 +211,146 @@ class LeasshConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class LeasshOptionsFlow(OptionsFlow):
-    """Options: companion-app notification targets (comma-separated)."""
+    """Options: notifications, node onboarding, protection and recipes."""
+
+    def _client(self) -> LeasshClient:
+        entry = self.config_entry
+        return LeasshClient(
+            async_get_clientsession(self.hass),
+            normalize_server_url(entry.data[CONF_SERVER_URL]),
+            entry.data[CONF_API_TOKEN],
+        )
 
     async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["notify", "add_node", "protection", "recipes"],
+            description_placeholders={
+                "server": self.config_entry.data.get(CONF_SERVER_URL, "")
+            },
+        )
+
+    async def async_step_notify(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
             raw = user_input.get(CONF_NOTIFY_TARGETS, "")
             targets = [t.strip() for t in raw.split(",") if t.strip()]
             return self.async_create_entry(
-                title="", data={CONF_NOTIFY_TARGETS: targets}
+                title="", data={**self.config_entry.options, CONF_NOTIFY_TARGETS: targets}
             )
         current = self.config_entry.options.get(CONF_NOTIFY_TARGETS, [])
         return self.async_show_form(
-            step_id="init",
+            step_id="notify",
             data_schema=vol.Schema(
                 {vol.Optional(CONF_NOTIFY_TARGETS, default=",".join(current)): str}
             ),
+        )
+
+    async def async_step_add_node(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            node = {
+                "name": user_input["name"].strip(),
+                "host": user_input["host"].strip(),
+                "ssh": user_input["ssh"].strip(),
+                "os": (user_input.get("os") or "").strip() or None,
+                "reclaim_idle_sessions": bool(
+                    user_input.get("reclaim_idle_sessions", False)
+                ),
+            }
+            try:
+                await self._client().add_node(node)
+            except LeasshAuthError:
+                errors["base"] = "invalid_auth"
+            except LeasshApiError as err:
+                errors["base"] = "cannot_add_node"
+                _LOGGER.warning("Add node failed: %s", err)
+            else:
+                await self._client().test_node(node["name"])
+                return self.async_create_entry(
+                    title="", data={**self.config_entry.options}
+                )
+        return self.async_show_form(
+            step_id="add_node",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("name"): str,
+                    vol.Required("host"): str,
+                    vol.Required("ssh"): str,
+                    vol.Optional("os", default="linux"): vol.In(
+                        ["linux", "windows", "macos"]
+                    ),
+                    vol.Optional("site", default=""): str,
+                    vol.Optional("reclaim_idle_sessions", default=False): bool,
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_protection(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            profile = user_input["profile"]
+            try:
+                await self._client().set_protection_profile(
+                    profile, user_input.get("confirmation")
+                )
+            except LeasshApiError as err:
+                errors["base"] = "invalid_profile"
+                _LOGGER.warning("Protection profile failed: %s", err)
+            except LeasshAuthError:
+                errors["base"] = "invalid_auth"
+            else:
+                return self.async_create_entry(
+                    title="", data={**self.config_entry.options}
+                )
+        return self.async_show_form(
+            step_id="protection",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("profile", default="trusted_owner"): vol.In(
+                        ["trusted_owner", "guardian", "unrestricted", "custom"]
+                    ),
+                    vol.Optional("confirmation", default=""): str,
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_recipes(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            recipe_id = (user_input.get("recipe_id") or "").strip()
+            if recipe_id:
+                try:
+                    await self._client().install_recipe(recipe_id)
+                except LeasshApiError as err:
+                    errors["base"] = "recipe_install_failed"
+                    _LOGGER.warning("Recipe install failed: %s", err)
+                except LeasshAuthError:
+                    errors["base"] = "invalid_auth"
+                else:
+                    await self._client().list_recipes()
+                    return self.async_create_entry(
+                        title="", data={**self.config_entry.options}
+                    )
+            else:
+                return self.async_create_entry(
+                    title="", data={**self.config_entry.options}
+                )
+        return self.async_show_form(
+            step_id="recipes",
+            data_schema=vol.Schema(
+                {vol.Optional("recipe_id", default=""): str}
+            ),
+            errors=errors,
         )

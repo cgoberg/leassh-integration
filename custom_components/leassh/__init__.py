@@ -52,8 +52,94 @@ PLATFORMS: list[Platform] = [
 _STATIC_DIR = Path(__file__).parent / "static"
 
 
+def _first_runtime(hass: HomeAssistant) -> "LeasshRuntime | None":
+    for value in hass.data.get(DOMAIN, {}).values():
+        if isinstance(value, LeasshRuntime):
+            return value
+    return None
+
+
+def _register_services(hass: HomeAssistant) -> None:
+    """Register the shared control-plane actions as HA services."""
+    if hass.services.has_service(DOMAIN, "install_recipe"):
+        return
+
+    async def add_node(call) -> None:
+        runtime = _first_runtime(hass)
+        if runtime is None:
+            raise RuntimeError("Leassh is not configured")
+        node = dict(call.data)
+        node.pop("site", None)
+        await runtime.client.add_node(node)
+        await runtime.coordinator.async_refresh()
+
+    async def remove_node(call) -> None:
+        runtime = _first_runtime(hass)
+        if runtime is None:
+            raise RuntimeError("Leassh is not configured")
+        await runtime.client.remove_node(call.data["name"])
+        await runtime.coordinator.async_refresh()
+
+    async def install_recipe(call) -> None:
+        runtime = _first_runtime(hass)
+        if runtime is None:
+            raise RuntimeError("Leassh is not configured")
+        await runtime.client.install_recipe(call.data["recipe_id"])
+        await runtime.coordinator.async_refresh()
+
+    async def configure_recipe(call) -> None:
+        runtime = _first_runtime(hass)
+        if runtime is None:
+            raise RuntimeError("Leassh is not configured")
+        await runtime.client.update_recipe_instance(
+            call.data["instance"], parameters=call.data.get("parameters")
+        )
+        await runtime.coordinator.async_refresh()
+
+    async def set_recipe_enabled(call) -> None:
+        runtime = _first_runtime(hass)
+        if runtime is None:
+            raise RuntimeError("Leassh is not configured")
+        await runtime.client.set_recipe_enabled(
+            call.data["instance"], bool(call.data["enabled"])
+        )
+        await runtime.coordinator.async_refresh()
+
+    async def dry_run_recipe(call) -> dict[str, Any]:
+        runtime = _first_runtime(hass)
+        if runtime is None:
+            raise RuntimeError("Leassh is not configured")
+        return await runtime.client.dry_run_recipe(
+            call.data["instance"],
+            call.data.get("node"),
+            int(call.data.get("idle_minutes", 15)),
+        )
+
+    async def set_protection_profile(call) -> None:
+        runtime = _first_runtime(hass)
+        if runtime is None:
+            raise RuntimeError("Leassh is not configured")
+        await runtime.client.set_protection_profile(
+            call.data["profile"], call.data.get("confirmation")
+        )
+        await runtime.coordinator.async_refresh()
+
+    hass.services.async_register(DOMAIN, "add_node", add_node)
+    hass.services.async_register(DOMAIN, "remove_node", remove_node)
+    hass.services.async_register(DOMAIN, "install_recipe", install_recipe)
+    hass.services.async_register(DOMAIN, "configure_recipe", configure_recipe)
+    hass.services.async_register(DOMAIN, "set_recipe_enabled", set_recipe_enabled)
+    hass.services.async_register(
+        DOMAIN, "dry_run_recipe", dry_run_recipe, supports_response=True
+    )
+    hass.services.async_register(
+        DOMAIN, "set_protection_profile", set_protection_profile
+    )
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.data.setdefault(DOMAIN, {})
+    _register_services(hass)
     if _STATIC_DIR.is_dir() and hass.http is not None:
         try:
             # StaticPathConfig arrived ~2024.7; the floor (2024.6) uses

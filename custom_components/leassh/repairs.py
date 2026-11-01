@@ -27,6 +27,43 @@ async def async_check(hass: HomeAssistant, entry: ConfigEntry, runtime) -> None:
     _check_license(hass, health)
     _check_packs(hass, entry, health)
     _check_telemetry(hass, entry, runtime)
+    _check_recipes(hass, entry, runtime)
+
+
+def _check_recipes(hass: HomeAssistant, entry: ConfigEntry, runtime) -> None:  # noqa: ARG001
+    """Broken recipes and missing dependencies become repair issues."""
+    active: set[str] = set()
+    for record in runtime.coordinator.recipe_instances:
+        instance = record.get("instance") or {}
+        instance_id = instance.get("id")
+        if not instance_id:
+            continue
+        error = instance.get("last_error")
+        status = record.get("status") or {}
+        suppressed = instance.get("last_suppressed_reason")
+        if not error and not suppressed:
+            continue
+        issue_id = f"recipe_broken_{instance_id}"
+        active.add(issue_id)
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=True,
+            is_persistent=True,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="recipe_broken",
+            translation_placeholders={
+                "recipe": str(instance.get("recipe_id")),
+                "instance": str(instance_id),
+                "error": str(error or suppressed)[:200],
+            },
+            data={"instance": instance_id, "recipe": instance.get("recipe_id")},
+        )
+    previous = hass.data.setdefault(DOMAIN, {}).get("repair_recipe_issues", set())
+    for issue_id in previous - active:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+    hass.data[DOMAIN]["repair_recipe_issues"] = active
 
 
 def _check_license(hass: HomeAssistant, health: dict) -> None:
@@ -221,6 +258,15 @@ class LeasshRepairFlow(RepairsFlow):
                     "entry": str(self.data.get("entry")),
                 },
             )
+        if self.issue_id.startswith("recipe_broken_"):
+            return self.async_show_menu(
+                step_id="init",
+                menu_options=["retry", "disable_recipe"],
+                description_placeholders={
+                    "recipe": str(self.data.get("recipe")),
+                    "instance": str(self.data.get("instance")),
+                },
+            )
         return self.async_show_menu(
             step_id="init",
             menu_options=["retry"],
@@ -277,6 +323,18 @@ class LeasshRepairFlow(RepairsFlow):
                 await runtime.client.reload_packs()
             except Exception as err:  # noqa: BLE001 - surface, do not crash the flow
                 _LOGGER.warning("Pack reload failed: %s", err)
+            await runtime.coordinator.async_refresh()
+        ir.async_delete_issue(self.hass, DOMAIN, self.issue_id)
+        return self.async_create_entry(title="", data={})
+
+    async def async_step_disable_recipe(self, user_input=None):
+        runtime = await self._runtime()
+        instance = self.data.get("instance")
+        if runtime is not None and instance:
+            try:
+                await runtime.client.set_recipe_enabled(str(instance), False)
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("Disabling recipe %s failed: %s", instance, err)
             await runtime.coordinator.async_refresh()
         ir.async_delete_issue(self.hass, DOMAIN, self.issue_id)
         return self.async_create_entry(title="", data={})

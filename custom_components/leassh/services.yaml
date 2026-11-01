@@ -1,0 +1,91 @@
+add_node:
+  name: Add node
+  description: Add a node to the Leassh server without editing YAML.
+  fields:
+    name:
+      required: true
+      selector:
+        text:
+    host:
+      required: true
+      selector:
+        text:
+    ssh:
+      required: true
+      selector:
+        text:
+    os:
+      selector:
+        select:
+          options: [linux, windows, macos]
+    site:
+      selector:
+        text:
+remove_node:
+  name: Remove node
+  description: Remove a node from the Leassh server configuration.
+  fields:
+    name:
+      required: true
+      selector:
+        text:
+install_recipe:
+  name: Install recipe
+  description: Install a first-party recipe definition.
+  fields:
+    recipe_id:
+      required: true
+      selector:
+        text:
+configure_recipe:
+  name: Configure recipe
+  description: Update an installed recipe instance's parameters.
+  fields:
+    instance:
+      required: true
+      selector:
+        text:
+    parameters:
+      required: true
+      selector:
+        object:
+set_recipe_enabled:
+  name: Enable or disable recipe
+  description: Enable or disable a recipe instance.
+  fields:
+    instance:
+      required: true
+      selector:
+        text:
+    enabled:
+      required: true
+      selector:
+        boolean:
+dry_run_recipe:
+  name: Dry-run recipe
+  description: Preview a recipe instance without executing it.
+  fields:
+    instance:
+      required: true
+      selector:
+        text:
+    node:
+      selector:
+        text:
+    idle_minutes:
+      selector:
+        number:
+          min: 0
+          max: 1440
+set_protection_profile:
+  name: Set protection profile
+  description: Choose Guardian, Trusted owner, Unrestricted or Custom.
+  fields:
+    profile:
+      required: true
+      selector:
+        select:
+          options: [guardian, trusted_owner, unrestricted, custom]
+    confirmation:
+      selector:
+        text:

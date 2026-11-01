@@ -13,7 +13,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import LeasshApiError, LeasshAuthError, LeasshClient, LeasshConnectionError
-from .const import DOMAIN, FAMILY_SENSOR_KEYS
+from .const import DOMAIN
 from .entity import device_identifier, entity_unique_id, node_host
 
 _LOGGER = logging.getLogger(__name__)
@@ -68,11 +68,13 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # presence pushes. Used by repairs and pack suggestions.
         self.health: dict[str, Any] = {}
         self.suggestions: dict[str, Any] = {}
-        # Hub-level summaries: fleet claims/sites/audit and family screen time.
+        # Hub-level summaries: fleet claims/sites/audit, setup doctor, recipes.
         self.fleet: dict[str, Any] = {}
-        self.family: dict[str, Any] = {}
         self.consent: dict[str, Any] = {}
-        self.idle_policy: dict[str, Any] = {}
+        self.setup: dict[str, Any] = {}
+        self.recipes: dict[str, Any] = {}
+        self.recipe_instances: list[dict[str, Any]] = []
+        self.capabilities: dict[str, Any] = {}
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
@@ -86,17 +88,24 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except (LeasshApiError, LeasshConnectionError):
             self.fleet = {}
         try:
-            self.family = await self.client.family_summary()
-        except (LeasshApiError, LeasshConnectionError):
-            self.family = {}
-        try:
             self.consent = await self.client.consent()
         except (LeasshApiError, LeasshConnectionError):
             self.consent = {}
         try:
-            self.idle_policy = await self.client.idle_policy()
+            self.setup = await self.client.setup_status()
         except (LeasshApiError, LeasshConnectionError):
-            self.idle_policy = {}
+            self.setup = {}
+        try:
+            self.recipes = await self.client.list_recipes()
+            instances = await self.client.recipe_instances()
+            self.recipe_instances = instances.get("instances") or []
+        except (LeasshApiError, LeasshConnectionError):
+            self.recipes = {}
+            self.recipe_instances = []
+        try:
+            self.capabilities = await self.client.capability_manifest()
+        except (LeasshApiError, LeasshConnectionError):
+            self.capabilities = {}
         if data is None:  # 304: nothing changed
             assert self.data is not None
             return self.data
@@ -185,9 +194,6 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self, entry: ConfigEntry, host: str, node: dict[str, Any]
     ) -> set[str]:
         expected = {entity_unique_id(entry, host, key) for key in FIXED_ENTITY_KEYS}
-        expected |= {
-            entity_unique_id(entry, host, key) for key in FAMILY_SENSOR_KEYS
-        }
         for metric_id in (node.get("metrics") or {}):
             expected.add(entity_unique_id(entry, host, metric_id))
         for series_id, instances in (node.get("series") or {}).items():

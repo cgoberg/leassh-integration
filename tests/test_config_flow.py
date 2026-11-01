@@ -148,3 +148,76 @@ async def test_user_flow_reports_license_invalid_not_cannot_connect(hass) -> Non
         )
     assert result["type"] == data_entry_flow.FlowResultType.FORM
     assert result["errors"] == {"base": "license_invalid"}
+
+
+async def test_options_add_node_without_yaml(hass) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SERVER_URL: "http://127.0.0.1:8790", CONF_API_TOKEN: "token"},
+        unique_id="127.0.0.1:8790",
+    )
+    entry.add_to_hass(hass)
+
+    added = {}
+
+    async def fake_add_node(self, node):
+        added.update(node)
+        return {"ok": True}
+
+    async def fake_test_node(self, name):
+        return {"ok": True, "reachable": True}
+
+    with patch(
+        "custom_components.leassh.api.LeasshClient.add_node", new=fake_add_node
+    ), patch(
+        "custom_components.leassh.api.LeasshClient.test_node", new=fake_test_node
+    ):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        assert result["type"] == data_entry_flow.FlowResultType.MENU
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "add_node"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                "name": "laptop",
+                "host": "10.0.0.10",
+                "ssh": "user@10.0.0.10",
+                "os": "linux",
+                "site": "home",
+                "reclaim_idle_sessions": False,
+            },
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert added["name"] == "laptop"
+    assert added["ssh"] == "user@10.0.0.10"
+
+
+async def test_options_protection_profile_requires_unrestricted_confirmation(hass) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SERVER_URL: "http://127.0.0.1:8790", CONF_API_TOKEN: "token"},
+        unique_id="127.0.0.1:8790",
+    )
+    entry.add_to_hass(hass)
+    calls = []
+
+    async def fake_profile(self, profile, confirmation=None):
+        calls.append((profile, confirmation))
+        return {"ok": True}
+
+    with patch(
+        "custom_components.leassh.api.LeasshClient.set_protection_profile",
+        new=fake_profile,
+    ):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "protection"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {"profile": "unrestricted", "confirmation": "UNRESTRICTED"},
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert calls == [("unrestricted", "UNRESTRICTED")]

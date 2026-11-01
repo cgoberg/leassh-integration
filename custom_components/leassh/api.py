@@ -156,20 +156,165 @@ class LeasshClient:
                 raise LeasshApiError(f"/api/consent returned {resp.status}")
             return await resp.json()
 
-    async def idle_policy(self) -> dict[str, Any]:
-        """Effective idle-session and app-reclamation policy per node."""
-        resp = await self._request("GET", "/api/idle-policy")
+    async def setup_status(self) -> dict[str, Any]:
+        """Shared setup doctor: server, license, API, SSH, nodes, protection."""
+        resp = await self._request("GET", "/api/setup/status")
         async with resp:
             if resp.status != 200:
-                raise LeasshApiError(f"/api/idle-policy returned {resp.status}")
+                raise LeasshApiError(f"/api/setup/status returned {resp.status}")
             return await resp.json()
 
-    async def family_summary(self) -> dict[str, Any]:
-        """Per-device screen time, limits and bedtime for parent dashboards."""
-        resp = await self._request("GET", "/api/family/summary")
+    async def setup_state(self) -> dict[str, Any]:
+        resp = await self._request("GET", "/api/setup/state")
         async with resp:
             if resp.status != 200:
-                raise LeasshApiError(f"/api/family/summary returned {resp.status}")
+                raise LeasshApiError(f"/api/setup/state returned {resp.status}")
+            return await resp.json()
+
+    async def set_protection_profile(
+        self, profile: str, confirmation: str | None = None
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {"profile": profile, "explained": True}
+        if confirmation:
+            body["confirmation"] = confirmation
+        resp = await self._request("POST", "/api/setup/profile", json=body)
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/setup/profile failed: {payload}")
+            return payload
+
+    async def list_nodes(self) -> dict[str, Any]:
+        resp = await self._request("GET", "/api/setup/nodes")
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/setup/nodes returned {resp.status}")
+            return await resp.json()
+
+    async def add_node(self, node: dict[str, Any]) -> dict[str, Any]:
+        resp = await self._request("POST", "/api/setup/nodes", json=node)
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"add node failed: {payload}")
+            return payload
+
+    async def remove_node(self, name: str) -> dict[str, Any]:
+        resp = await self._request("DELETE", f"/api/setup/nodes/{name}")
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"remove node failed: {payload}")
+            return payload
+
+    async def test_node(self, name: str) -> dict[str, Any]:
+        resp = await self._request("POST", f"/api/setup/nodes/{name}/test", json={})
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"test node failed: {payload}")
+            return payload
+
+    async def list_recipes(self) -> dict[str, Any]:
+        resp = await self._request("GET", "/api/recipes")
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/recipes returned {resp.status}")
+            return await resp.json()
+
+    async def install_recipe(self, recipe_id: str) -> dict[str, Any]:
+        resp = await self._request(
+            "POST", "/api/recipes/install", json={"id": recipe_id}
+        )
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"install recipe failed: {payload}")
+            return payload
+
+    async def recipe_instances(self) -> dict[str, Any]:
+        resp = await self._request("GET", "/api/recipe-instances")
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/recipe-instances returned {resp.status}")
+            return await resp.json()
+
+    async def create_recipe_instance(
+        self, recipe_id: str, parameters: dict[str, Any], enabled: bool
+    ) -> dict[str, Any]:
+        resp = await self._request(
+            "POST",
+            "/api/recipe-instances",
+            json={
+                "recipe_id": recipe_id,
+                "parameters": parameters,
+                "enabled": enabled,
+            },
+        )
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"create recipe instance failed: {payload}")
+            return payload
+
+    async def update_recipe_instance(
+        self, instance: str, parameters: dict[str, Any] | None = None,
+        enabled: bool | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {}
+        if parameters is not None:
+            body["parameters"] = parameters
+        if enabled is not None:
+            body["enabled"] = enabled
+        resp = await self._request(
+            "PATCH", f"/api/recipe-instances/{instance}", json=body
+        )
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"update recipe instance failed: {payload}")
+            return payload
+
+    async def set_recipe_enabled(self, instance: str, enabled: bool) -> dict[str, Any]:
+        verb = "enable" if enabled else "disable"
+        resp = await self._request(
+            "POST", f"/api/recipe-instances/{instance}/{verb}", json={}
+        )
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"recipe {verb} failed: {payload}")
+            return payload
+
+    async def dry_run_recipe(
+        self, instance: str, node: str | None = None, idle_minutes: int = 15
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {"idle_minutes": idle_minutes}
+        if node:
+            body["node"] = node
+        resp = await self._request(
+            "POST", f"/api/recipe-instances/{instance}/dry-run", json=body
+        )
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"recipe dry-run failed: {payload}")
+            return payload
+
+    async def recipe_status(self, instance: str) -> dict[str, Any]:
+        resp = await self._request(
+            "GET", f"/api/recipe-instances/{instance}/status"
+        )
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"recipe status returned {resp.status}")
+            return await resp.json()
+
+    async def capability_manifest(self) -> dict[str, Any]:
+        resp = await self._request("GET", "/api/capabilities?client=ha")
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/capabilities returned {resp.status}")
             return await resp.json()
 
     async def get_pack_suggestions(self) -> dict[str, Any]:

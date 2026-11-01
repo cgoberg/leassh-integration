@@ -43,10 +43,52 @@
   "options": {
     "step": {
       "init": {
+        "description": "Configure notifications, add a node, choose the protection profile, or manage recipes.",
+        "menu_options": [
+          "notify",
+          "add_node",
+          "protection",
+          "recipes"
+        ],
         "data": {
-          "notify_targets": "Companion-app notify targets (comma-separated notify service names, e.g. mobile_app_iphone; empty = all mobile_app targets)"
+          "notify_targets": "Companion-app notify targets (comma-separated notify service names)"
+        }
+      },
+      "notify": {
+        "data": {
+          "notify_targets": "Companion-app notify targets (comma-separated notify service names)"
+        }
+      },
+      "add_node": {
+        "description": "Add a node without editing YAML. The server validates and atomically writes the config; restart may be required for probing.",
+        "data": {
+          "name": "Name",
+          "host": "Host or IP",
+          "ssh": "SSH target (user@host)",
+          "os": "Operating system",
+          "site": "Site (optional)",
+          "reclaim_idle_sessions": "Enable idle-session reclamation"
+        }
+      },
+      "protection": {
+        "description": "Choose one profile. Trusted owner is the single-owner default; Guardian asks for approval on disruptive actions; Unrestricted removes blast-radius protections and requires typed confirmation.",
+        "data": {
+          "profile": "Protection profile",
+          "confirmation": "Type UNRESTRICTED to confirm"
+        }
+      },
+      "recipes": {
+        "description": "Install a first-party recipe by id, or leave empty to just refresh.",
+        "data": {
+          "recipe_id": "Recipe id (optional)"
         }
       }
+    },
+    "error": {
+      "cannot_add_node": "The server rejected the node. Check the name, host and SSH target.",
+      "invalid_profile": "The protection profile change was rejected. Unrestricted requires the typed confirmation.",
+      "recipe_install_failed": "The server rejected the recipe install.",
+      "invalid_auth": "The server rejected the token."
     }
   },
   "entity": {
@@ -132,6 +174,12 @@
           "unlimited": "Unlimited",
           "unknown": "Unknown"
         }
+      },
+      "setup_status": {
+        "name": "Setup status"
+      },
+      "recipes_installed": {
+        "name": "Recipes installed"
       }
     },
     "button": {
@@ -163,7 +211,7 @@
           },
           "update_license": {
             "title": "Update the license key",
-            "description": "In Home Assistant: Settings → Add-ons → Leassh → Configuration → `license_token`. In a manual server: `license_key` in `fleet.yaml`. Restart Leassh, then submit to re-check. Free keys start with LSH-; offline paid tokens start with LSH1."
+            "description": "In Home Assistant: Settings \u2192 Add-ons \u2192 Leassh \u2192 Configuration \u2192 `license_token`. In a manual server: `license_key` in `fleet.yaml`. Restart Leassh, then submit to re-check. Free keys start with LSH-; offline paid tokens start with LSH1."
           },
           "upgrade": {
             "title": "Upgrade",
@@ -258,6 +306,29 @@
           "upgrade": {
             "title": "Upgrade",
             "description": "Open {upgrade_url} in a browser."
+          }
+        }
+      }
+    },
+    "recipe_broken": {
+      "title": "Recipe {recipe} needs attention",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair Leassh recipe",
+            "description": "{error}",
+            "menu_options": {
+              "retry": "Re-check the recipe",
+              "disable_recipe": "Disable this recipe instance"
+            }
+          },
+          "retry": {
+            "title": "Re-checking",
+            "description": "Refreshing recipe status."
+          },
+          "disable_recipe": {
+            "title": "Disabling recipe",
+            "description": "The instance will not run until re-enabled."
           }
         }
       }

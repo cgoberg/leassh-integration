@@ -49,6 +49,29 @@ async def async_get_config_entry_diagnostics(
             "etag": redact(runtime.coordinator._etag or ""),
             "nodes": len((runtime.coordinator.data or {}).get("nodes", [])),
         },
+        "setup": {
+            "ok": (getattr(runtime.coordinator, "setup", None) or {}).get("ok"),
+            "profile": (getattr(runtime.coordinator, "setup", None) or {}).get("profile"),
+            "pending_steps": (getattr(runtime.coordinator, "setup", None) or {}).get("pending_steps"),
+            "steps": [
+                {"id": step.get("id"), "status": step.get("status")}
+                for step in (getattr(runtime.coordinator, "setup", None) or {}).get("steps", [])
+            ],
+        },
+        "recipes": {
+            "catalog": len((getattr(runtime.coordinator, "recipes", None) or {}).get("catalog", [])),
+            "installed": len((getattr(runtime.coordinator, "recipes", None) or {}).get("installed", [])),
+            "instances": [
+                {
+                    "id": (record.get("instance") or {}).get("id"),
+                    "recipe": (record.get("instance") or {}).get("recipe_id"),
+                    "enabled": (record.get("instance") or {}).get("enabled"),
+                    "status": (record.get("instance") or {}).get("status"),
+                    "last_error": (record.get("instance") or {}).get("last_error"),
+                }
+                for record in getattr(runtime.coordinator, "recipe_instances", [])
+            ],
+        },
         # Keys, not values: enough to prove a pack's telemetry arrived without
         # turning a support download into a window-title dump.
         "telemetry": [

@@ -207,44 +207,23 @@ async def async_setup_entry(
     add_node_sensors()
     entry.async_on_unload(coordinator.async_add_listener(add_node_sensors))
 
-    child_seen: set[tuple[str, str]] = set()
+    recipe_seen: set[str] = set()
 
-    def add_child_sensors() -> None:
+    def add_recipe_sensors() -> None:
         new: list[SensorEntity] = []
-        children = (coordinator.family or {}).get("children", [])
-        for child in children:
-            name = child.get("name")
-            if not name:
+        for record in coordinator.recipe_instances:
+            instance = record.get("instance") or {}
+            instance_id = instance.get("id")
+            if not instance_id or instance_id in recipe_seen:
                 continue
-            node = next(
-                (
-                    candidate
-                    for candidate in (coordinator.data or {}).get("nodes", [])
-                    if candidate.get("name") == name
-                ),
-                None,
-            )
-            if node is None:
-                continue
-            device = node_device(hass, entry, node)
-            if device is None:
-                continue
-            identity = node_host(node) or name
-            for description in CHILD_SENSORS:
-                key = (identity, description.key)
-                if key in child_seen:
-                    continue
-                child_seen.add(key)
-                new.append(
-                    LeasshChildSensor(
-                        coordinator, entry, name, identity, device, description
-                    )
-                )
+            recipe_seen.add(instance_id)
+            new.append(RecipeStatusSensor(entry, runtime, record))
         if new:
             async_add_entities(new)
 
-    add_child_sensors()
-    entry.async_on_unload(coordinator.async_add_listener(add_child_sensors))
+    add_recipe_sensors()
+    entry.async_on_unload(coordinator.async_add_listener(add_recipe_sensors))
+
     async_add_entities([
         LeasshPackSuggestionsSensor(entry, runtime),
         LeasshLicenseSensor(entry, runtime),
@@ -648,41 +627,19 @@ HUB_SENSORS: tuple[HubSensorDescription, ...] = (
         source="consent",
     ),
     HubSensorDescription(
-        "idle_policy",
-        "Idle policy",
-        "mdi:tune",
-        attributes=("nodes", "enabled_count", "override_count", "defaults"),
-        source="idle_policy",
+        "setup_status",
+        "Setup status",
+        "mdi:clipboard-check-outline",
+        attributes=("pending_steps", "steps", "profile", "version"),
+        source="setup",
     ),
     HubSensorDescription(
-        "family_screen_time",
-        "Family screen time",
-        "mdi:timer-outline",
-        unit=UnitOfTime.MINUTES,
+        "recipes_installed",
+        "Recipes installed",
+        "mdi:book-open-variant",
         state_class=SensorStateClass.MEASUREMENT,
-        attributes=("children", "narrative", "over_limit_children", "bedtime_active_children", "generated_at"),
-        source="family",
-    ),
-    HubSensorDescription(
-        "family_over_limit",
-        "Family over limit",
-        "mdi:alert-circle",
-        state_class=SensorStateClass.MEASUREMENT,
-        source="family",
-    ),
-    HubSensorDescription(
-        "family_bedtime_active",
-        "Family bedtime active",
-        "mdi:weather-night",
-        state_class=SensorStateClass.MEASUREMENT,
-        source="family",
-    ),
-    HubSensorDescription(
-        "family_devices",
-        "Family devices",
-        "mdi:devices",
-        state_class=SensorStateClass.MEASUREMENT,
-        source="family",
+        attributes=("catalog_count", "installed_count", "instance_count", "bundles"),
+        source="recipes",
     ),
 )
 
@@ -719,12 +676,12 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
         return f"leassh_{self._description.key}"
 
     def _data(self) -> dict[str, Any]:
-        if self._description.source == "family":
-            return self.coordinator.family or {}
         if self._description.source == "consent":
             return self.coordinator.consent or {}
-        if self._description.source == "idle_policy":
-            return self.coordinator.idle_policy or {}
+        if self._description.source == "setup":
+            return self.coordinator.setup or {}
+        if self._description.source == "recipes":
+            return self.coordinator.recipes or {}
         return self.coordinator.fleet or {}
 
     @property
@@ -755,18 +712,12 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
             return round((reachable / total) * 100) if total else 0
         if key == "consent":
             return data.get("total")
-        if key == "idle_policy":
-            return data.get("enabled_count", 0)
         if key == "fleet_ledger_valid":
             return "valid" if data.get("ledger_valid") else "invalid"
-        if key == "family_screen_time":
-            return round((data.get("total_screen_seconds") or 0) / 60)
-        if key == "family_over_limit":
-            return data.get("over_limit_children")
-        if key == "family_bedtime_active":
-            return data.get("bedtime_active_children")
-        if key == "family_devices":
-            return len(data.get("children") or [])
+        if key == "setup_status":
+            return "ready" if data.get("ok") else "needs_attention"
+        if key == "recipes_installed":
+            return len((self.coordinator.recipes or {}).get("installed") or [])
         return data.get(key)
 
     @property
@@ -783,120 +734,67 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
         return self.coordinator.last_update_success and bool(self._data())
 
 
-@dataclass(frozen=True)
-class ChildSensorDescription:
-    key: str
-    name: str
-    icon: str
-    unit: str | None = None
-    state_class: SensorStateClass | None = None
-
-
-CHILD_SENSORS: tuple[ChildSensorDescription, ...] = (
-    ChildSensorDescription(
-        "screen_time_today",
-        "Screen time today",
-        "mdi:timer-outline",
-        unit=UnitOfTime.MINUTES,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    ChildSensorDescription(
-        "screen_time_status",
-        "Screen time limit",
-        "mdi:timer-check-outline",
-    ),
-    ChildSensorDescription(
-        "bedtime_status",
-        "Bedtime",
-        "mdi:weather-night",
-    ),
-)
-
-
-class LeasshChildSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
-    """Parent-facing per-child screen time, limit and bedtime state."""
+class RecipeStatusSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
+    """One recipe instance: enabled/disabled/error plus why and next run."""
 
     _attr_has_entity_name = True
+    _attr_icon = "mdi:book-cog-outline"
 
     def __init__(
         self,
-        coordinator: LeasshCoordinator,
         entry: ConfigEntry,
-        child_name: str,
-        identity: str,
-        device: DeviceInfo,
-        description: ChildSensorDescription,
+        runtime: LeasshRuntime,
+        record: dict[str, Any],
     ) -> None:
-        super().__init__(coordinator)
+        super().__init__(runtime.coordinator)
         self._entry = entry
-        self._child_name = child_name
-        self._description = description
-        self._attr_unique_id = f"{entry.entry_id}_{identity}_{description.key}"
-        self._attr_name = description.name
-        self._attr_icon = description.icon
-        if description.unit:
-            self._attr_native_unit_of_measurement = description.unit
-        if description.state_class:
-            self._attr_state_class = description.state_class
-        self._attr_device_info = device
+        self._instance_id = (record.get("instance") or {}).get("id")
+        self._attr_unique_id = f"{entry.entry_id}_recipe_{self._instance_id}"
+        self._attr_device_info = hub_device(entry, runtime.client.base_url)
+        instance = record.get("instance") or {}
+        self._attr_name = f"Recipe {instance.get('recipe_id', self._instance_id)}"
 
-    def _child(self) -> dict[str, Any] | None:
-        for child in (self.coordinator.family or {}).get("children", []):
-            if child.get("name") == self._child_name:
-                return child
-        return None
+    def _record(self) -> dict[str, Any]:
+        for record in self.coordinator.recipe_instances:
+            if (record.get("instance") or {}).get("id") == self._instance_id:
+                return record
+        return {}
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self._child() is not None
+        return self.coordinator.last_update_success and bool(self._record())
 
     @property
-    def native_value(self) -> Any:
-        child = self._child() or {}
-        if self._description.key == "screen_time_today":
-            screen = child.get("screen_time") or {}
-            return round((screen.get("total_seconds") or 0) / 60)
-        if self._description.key == "screen_time_status":
-            limits = child.get("limits") or []
-            if not limits:
-                return "No limit"
-            return "Over limit" if any(limit.get("over_limit") for limit in limits) else "Within limit"
-        bedtime = child.get("bedtime") or {}
-        if not bedtime.get("bedtime_enabled"):
-            return "Off"
-        return "Active" if bedtime.get("bedtime_active") else "Scheduled"
-
-    @property
-    def icon(self) -> str:
-        if self._description.key == "screen_time_status":
-            state = self.native_value
-            if state == "Over limit":
-                return "mdi:timer-alert-outline"
-            if state == "No limit":
-                return "mdi:timer-off-outline"
-            return "mdi:timer-check-outline"
-        if self._description.key == "bedtime_status":
-            return "mdi:weather-night" if self.native_value == "Active" else "mdi:weather-night-partly-cloudy"
-        return self._description.icon
+    def native_value(self) -> str | None:
+        record = self._record()
+        instance = record.get("instance") or {}
+        status = record.get("status") or {}
+        if instance.get("last_error"):
+            return "error"
+        if not instance.get("enabled"):
+            return "disabled"
+        return str(instance.get("status") or "installed")
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        child = self._child() or {}
-        if self._description.key == "screen_time_today":
-            return {
-                "date": (child.get("screen_time") or {}).get("date"),
-                "categories": (child.get("screen_time") or {}).get("categories") or [],
-                "limits": child.get("limits") or [],
-                "bedtime": child.get("bedtime") or {},
-                "online": child.get("online"),
-                "at_desk": child.get("at_desk"),
-                "console_signed_in": child.get("console_signed_in"),
-                "open_claims": child.get("open_claims") or [],
-                "account": child.get("account"),
-            }
-        if self._description.key == "screen_time_status":
-            return {"limits": child.get("limits") or []}
-        return {"bedtime": child.get("bedtime") or {}}
+        record = self._record()
+        instance = record.get("instance") or {}
+        status = record.get("status") or {}
+        return {
+            "instance": self._instance_id,
+            "recipe_id": instance.get("recipe_id"),
+            "recipe_version": instance.get("recipe_version"),
+            "scope": instance.get("scope"),
+            "target": instance.get("target"),
+            "parameter_hash": instance.get("parameter_hash"),
+            "last_run_at": instance.get("last_run_at"),
+            "next_run_at": instance.get("next_run_at"),
+            "last_error": instance.get("last_error"),
+            "suppressed_reason": instance.get("last_suppressed_reason"),
+            "pending_actions": len(status.get("pending") or []),
+            "jobs": status.get("jobs") or [],
+            "recent_events": (status.get("recent_events") or [])[:5],
+        }
 
 
 class LeasshPackSuggestionsSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):

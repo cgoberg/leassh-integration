@@ -17,7 +17,6 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from custom_components.leassh.binary_sensor import NodeBinarySensor
 from custom_components.leassh.button import ActionButton
 from custom_components.leassh.const import DOMAIN
-from custom_components.leassh.const import FAMILY_SENSOR_KEYS
 from custom_components.leassh.coordinator import FIXED_ENTITY_KEYS, LeasshCoordinator
 from custom_components.leassh.entity import (
     device_identifier,
@@ -30,6 +29,7 @@ from custom_components.leassh.sensor import (
     NODE_SENSORS,
     GenericMetricSensor,
     NodeSensor,
+    RecipeStatusSensor,
     SeriesMetricSensor,
 )
 
@@ -440,7 +440,54 @@ async def test_lifecycle_expects_fixed_and_generic_entities(hass) -> None:
     expected = coordinator._expected_unique_ids(entry, "192.168.1.131", node)
     for key in FIXED_ENTITY_KEYS:
         assert entity_unique_id(entry, "192.168.1.131", key) in expected
-    for key in FAMILY_SENSOR_KEYS:
-        assert entity_unique_id(entry, "192.168.1.131", key) in expected
     assert "entry1_192.168.1.131_cpu_temp_c" in expected
     assert "entry1_192.168.1.131_gpu_nvidia_temperature_GPU-abc" in expected
+
+
+async def test_recipe_status_sensor_exposes_why_and_next_run(hass) -> None:
+    entry = make_entry()
+    coordinator = SimpleNamespace(
+        data={"nodes": [NODE]},
+        config_entry=entry,
+        last_update_success=True,
+        recipe_instances=[
+            {
+                "instance": {
+                    "id": "inst-1",
+                    "recipe_id": "household.bedtime",
+                    "recipe_version": "1.0.0",
+                    "scope": "node",
+                    "target": "192.168.1.131",
+                    "enabled": True,
+                    "status": "active",
+                    "last_run_at": "2026-11-01T20:00:00Z",
+                    "next_run_at": "2026-11-02T20:00:00Z",
+                    "last_error": None,
+                    "last_suppressed_reason": None,
+                    "parameter_hash": "a" * 64,
+                },
+                "status": {
+                    "pending": [],
+                    "jobs": [{"trigger_id": "quiet-hours"}],
+                    "recent_events": [{"kind": "recipe.action.executed"}],
+                },
+            }
+        ],
+    )
+    runtime = SimpleNamespace(
+        coordinator=coordinator,
+        client=SimpleNamespace(base_url="http://127.0.0.1:8790"),
+    )
+    sensor = RecipeStatusSensor(
+        entry, runtime, coordinator.recipe_instances[0]
+    )
+    assert sensor.unique_id == "entry1_recipe_inst-1"
+    assert sensor.native_value == "active"
+    attrs = sensor.extra_state_attributes
+    assert attrs["recipe_id"] == "household.bedtime"
+    assert attrs["next_run_at"] == "2026-11-02T20:00:00Z"
+    assert attrs["pending_actions"] == 0
+    assert attrs["jobs"][0]["trigger_id"] == "quiet-hours"
+
+    coordinator.recipe_instances[0]["instance"]["last_error"] = "missing provider"
+    assert sensor.native_value == "error"
