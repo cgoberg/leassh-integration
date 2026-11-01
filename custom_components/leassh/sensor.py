@@ -756,7 +756,13 @@ class RecipeStatusSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
         self._attr_unique_id = f"{entry.entry_id}_recipe_{self._instance_id}"
         self._attr_device_info = hub_device(entry, runtime.client.base_url)
         instance = record.get("instance") or {}
-        self._attr_name = f"Recipe {instance.get('recipe_id', self._instance_id)}"
+        self._recipe_id = instance.get("recipe_id", self._instance_id)
+        self._attr_name = f"Recipe {self._recipe_id}"
+
+    @property
+    def suggested_object_id(self) -> str:
+        """Stable dashboard id: leassh_recipe_<recipe-id>."""
+        return "leassh_recipe_" + str(self._recipe_id).replace(".", "_").replace("-", "_")
 
     def _record(self) -> dict[str, Any]:
         for record in self.coordinator.recipe_instances:

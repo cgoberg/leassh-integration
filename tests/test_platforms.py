@@ -342,6 +342,7 @@ async def test_hub_and_recipe_sensor_value_branches(hass) -> None:
     }
     coordinator.recipe_instances = [record]
     recipe = RecipeStatusSensor(entry, runtime, record)
+    assert recipe.suggested_object_id == "leassh_recipe_r"
     assert recipe.native_value == "disabled"
     record["instance"]["enabled"] = True
     record["instance"]["status"] = None
