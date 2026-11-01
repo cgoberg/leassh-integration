@@ -14,13 +14,16 @@ from typing import Any
 
 from pathlib import Path
 
+StaticPathConfig: Any
 try:
-    from homeassistant.components.http import StaticPathConfig
+    from homeassistant.components.http import StaticPathConfig as _StaticPathConfig
+
+    StaticPathConfig = _StaticPathConfig
 except ImportError:  # HA < 2024.7
     StaticPathConfig = None
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -134,7 +137,7 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, "configure_recipe", configure_recipe)
     hass.services.async_register(DOMAIN, "set_recipe_enabled", set_recipe_enabled)
     hass.services.async_register(
-        DOMAIN, "dry_run_recipe", dry_run_recipe, supports_response=True
+        DOMAIN, "dry_run_recipe", dry_run_recipe, supports_response=SupportsResponse.ONLY
     )
     hass.services.async_register(
         DOMAIN, "set_protection_profile", set_protection_profile
@@ -183,9 +186,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     runtime.ws.start()
     # Repairs are derived from live evidence on every poll.
-    coordinator.async_add_listener(
-        lambda: hass.async_create_task(async_check(hass, entry, runtime))
-    )
+    def _schedule_repairs() -> None:
+        hass.async_create_task(async_check(hass, entry, runtime))
+
+    coordinator.async_add_listener(_schedule_repairs)
     hass.async_create_task(async_check(hass, entry, runtime))
     # Registered for the WS watchdog: outage push delivery (notify.py
     # replaces this once its entity exists).
@@ -219,7 +223,7 @@ class LeasshRuntime:
         # Entities (the connected binary sensor) refresh on WS state flips.
         self.ws_callbacks: list = []
         # Replaced by notify.py during platform setup (an async callable).
-        self.send_notification = None
+        self.send_notification: Any = None
         # Presence/activity events are an accelerator over the 30 s poll, not
         # a source of truth. Coalesce bursts into one listener notification.
         self._event_pending = False

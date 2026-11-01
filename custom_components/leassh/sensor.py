@@ -170,10 +170,10 @@ async def async_setup_entry(
     runtime: LeasshRuntime = entry.runtime_data
     coordinator = runtime.coordinator
 
-    seen: set[str] = set()
+    seen: set[tuple[str, str, str | None]] = set()
     # Dynamic identities are allowed to come back after a genuine removal
     # (a GPU pulled and re-seated). Fixed identities never disappear.
-    dynamic_seen: set = set()
+    dynamic_seen: set[tuple[str, str, str | None]] = set()
 
     def add_node_sensors() -> None:
         new: list[SensorEntity] = []
@@ -186,7 +186,7 @@ async def async_setup_entry(
             if device is None:
                 continue
             for description in NODE_SENSORS:
-                identity = (host, description.key, None)
+                identity: tuple[str, str, str | None] = (host, description.key, None)
                 if identity in seen:
                     continue
                 seen.add(identity)
@@ -254,7 +254,7 @@ def _generic_entities(
     for metric_id, metric in (node.get("metrics") or {}).items():
         if not isinstance(metric, dict):
             continue
-        identity = (host, metric_id, None)
+        identity: tuple[str, str, str | None] = (host, metric_id, None)
         current.add(identity)
         if identity in seen:
             continue

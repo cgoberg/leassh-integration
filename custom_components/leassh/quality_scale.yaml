@@ -78,7 +78,7 @@ rules:
     status: done
   test-coverage:
     status: done
-    comment: pytest-cov runs on every gate with a 45% regression baseline (currently 45.74%); the 95% target remains a release metric.
+    comment: pytest-cov runs on every gate with a 95% threshold; the suite covers API, notify, WS, coordinator, repairs, platforms, setup and config/options flows.
 
   # --- Gold (21) --------------------------------------------------------
   devices:
@@ -144,4 +144,4 @@ rules:
     status: done
   strict-typing:
     status: done
-    comment: py.typed marker and mypy.ini are shipped; incremental typing is enforced by review.
+    comment: py.typed and mypy.ini are shipped; tests/test_typing.py runs mypy on every pytest gate.

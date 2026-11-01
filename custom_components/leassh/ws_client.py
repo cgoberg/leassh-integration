@@ -207,7 +207,7 @@ class LeasshWsClient:
         """
         ws = await self._client.ws_connect()
         try:
-            ws.send_json(
+            await ws.send_json(
                 {"jsonrpc": "2.0", "id": 2, "method": method, "params": params or {}}
             )
             async for msg in ws:

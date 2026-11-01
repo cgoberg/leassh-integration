@@ -70,13 +70,6 @@ def entity_unique_id(
     return base
 
 
-# `via_device_id` replaced `via_device` in newer HA (via_device stops
-# working in 2027.8) but did not exist at the old 2024.6 floor. Feature-detect
-# rather than version-guess: the registry signature is the arbiter.
-_REGISTRY_ACCEPTS_VIA_DEVICE_ID = "via_device_id" in inspect.signature(
-    dr.DeviceRegistry.async_get_or_create
-).parameters
-
 
 def hub_device(entry: ConfigEntry, server_url: str) -> DeviceInfo:
     return DeviceInfo(
@@ -111,10 +104,7 @@ def node_device(
     # omitted and the device attaches on a later entity update.
     hub = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
     if hub is not None:
-        if _REGISTRY_ACCEPTS_VIA_DEVICE_ID:
-            info["via_device_id"] = hub.id
-        else:
-            info["via_device"] = (DOMAIN, entry.entry_id)
+        info["via_device"] = (DOMAIN, entry.entry_id)
     # No configuration_url: HA only accepts http(s) URLs there, and a node
     # is reached over SSH, not over a web UI.
     return info

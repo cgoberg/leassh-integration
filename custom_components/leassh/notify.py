@@ -14,9 +14,7 @@ from typing import Any
 
 from homeassistant.components.notify import NotifyEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    ATTR_ENTITY_ID,
-)
+from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -42,7 +40,7 @@ async def async_setup_entry(
     # Wire the two delivery paths to this entity: WS notify events and the
     # WS watchdog's outage push.
     runtime.send_notification = entity.async_deliver
-    hass.data[DOMAIN]["outage_notifier"] = entity.async_deliver
+    hass.data.setdefault(DOMAIN, {})["outage_notifier"] = entity.async_deliver
 
 
 class LeasshNotifyEntity(NotifyEntity):
@@ -59,10 +57,8 @@ class LeasshNotifyEntity(NotifyEntity):
         self._attr_unique_id = f"{entry.entry_id}_notify"
         self._attr_device_info = hub_device(entry, runtime.client.base_url)
 
-    async def async_send_message(self, message: str, **kwargs: Any) -> None:
-        await self.async_deliver(
-            kwargs.get(ATTR_TITLE, "Leassh"), message, kwargs.get("data") or {}
-        )
+    async def async_send_message(self, message: str, title: str | None = None) -> None:
+        await self.async_deliver(title or "Leassh", message, {})
 
     async def async_deliver(
         self, title: str, message: str, data: dict[str, Any]

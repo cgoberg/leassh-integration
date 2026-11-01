@@ -376,7 +376,6 @@ class LeasshClient:
             ws = await self._session.ws_connect(
                 self.ws_url,
                 heartbeat=15,  # client-side WS ping; server pings too
-                timeout=20,
             )
         except (TimeoutError, aiohttp.ClientError) as err:
             msg = f"ws connect failed: {err}"

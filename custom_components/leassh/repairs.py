@@ -220,7 +220,11 @@ class LeasshRepairFlow(RepairsFlow):
 
     def __init__(self, issue_id: str, data: dict) -> None:
         self.issue_id = issue_id
-        self.data = data
+        self.data = data or {}
+
+    def _data(self) -> dict[str, str]:
+        raw = self.data or {}
+        return {key: str(value) for key, value in raw.items()}
 
     def _license_issue(self) -> bool:
         return self.issue_id in {
@@ -241,12 +245,12 @@ class LeasshRepairFlow(RepairsFlow):
                 step_id="init",
                 menu_options=options,
                 description_placeholders={
-                    "upgrade_url": self.data.get("upgrade_url", "https://leassh.com/pricing"),
-                    "account_url": self.data.get("account_url", "https://leassh.com/account"),
-                    "days": self.data.get("days", "0"),
-                    "current": self.data.get("current", "?"),
-                    "max": self.data.get("max", "?"),
-                    "tier": self.data.get("tier", "current"),
+                    "upgrade_url": self._data().get("upgrade_url", "https://leassh.com/pricing"),
+                    "account_url": self._data().get("account_url", "https://leassh.com/account"),
+                    "days": self._data().get("days", "0"),
+                    "current": self._data().get("current", "?"),
+                    "max": self._data().get("max", "?"),
+                    "tier": self._data().get("tier", "current"),
                 },
             )
         if self.issue_id.startswith("pack_parse_"):
@@ -254,8 +258,8 @@ class LeasshRepairFlow(RepairsFlow):
                 step_id="init",
                 menu_options=["retry", "disable_pack"],
                 description_placeholders={
-                    "pack": str(self.data.get("pack")),
-                    "entry": str(self.data.get("entry")),
+                    "pack": str(self._data().get("pack")),
+                    "entry": str(self._data().get("entry")),
                 },
             )
         if self.issue_id.startswith("recipe_broken_"):
@@ -263,8 +267,8 @@ class LeasshRepairFlow(RepairsFlow):
                 step_id="init",
                 menu_options=["retry", "disable_recipe"],
                 description_placeholders={
-                    "recipe": str(self.data.get("recipe")),
-                    "instance": str(self.data.get("instance")),
+                    "recipe": str(self._data().get("recipe")),
+                    "instance": str(self._data().get("instance")),
                 },
             )
         return self.async_show_menu(
@@ -333,7 +337,7 @@ class LeasshRepairFlow(RepairsFlow):
 
     async def async_step_disable_recipe(self, user_input=None):
         runtime = await self._runtime()
-        instance = self.data.get("instance")
+        instance = self._data().get("instance")
         if runtime is not None and instance:
             try:
                 await runtime.client.set_recipe_enabled(str(instance), False)
@@ -345,7 +349,7 @@ class LeasshRepairFlow(RepairsFlow):
 
     async def async_step_disable_pack(self, user_input=None):
         runtime = await self._runtime()
-        pack = self.data.get("pack")
+        pack = self._data().get("pack")
         if runtime is not None and pack:
             try:
                 await runtime.client.set_pack_enabled(str(pack), False)
