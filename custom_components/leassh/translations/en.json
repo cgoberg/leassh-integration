@@ -333,5 +333,10 @@
         }
       }
     }
+  },
+  "exceptions": {
+    "action_failed": {
+      "message": "Leassh action {action} on {node} failed: {error}"
+    }
   }
 }

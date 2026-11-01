@@ -165,3 +165,79 @@ same values. Tokens are still redacted.
 ## License
 
 MIT OR Apache-2.0 — see `LICENSE` and `LICENSE.APACHE`.
+
+## Configuration parameters
+
+The integration has one config entry (server URL + API token) and these options:
+
+- **notify_targets** — comma-separated `notify` service names (for example
+  `mobile_app_iphone`). Empty means every `mobile_app_*` target. Used only for
+  server-originated notifications; it does not grant any new server scope.
+
+Recipe parameters are configured through the options menu (**Configure →
+Recipes**) or the Leassh Console. Common operational parameters stay in HA;
+advanced authoring lives in the Console.
+
+## Data updates
+
+The coordinator polls `/api/devices` every 30 seconds with an ETag; a `304`
+keeps the previous snapshot. A WebSocket session carries commands, events and
+presence. `node.online`, `node.offline` and `node.activity` events update the
+snapshot in place, then the next poll reconciles. Events are an accelerator,
+never the only source of truth. Recipe/setup status is polled with the same
+coordinator cycle.
+
+## Supported devices
+
+- Linux, Windows and macOS hosts reachable over SSH.
+- Tool prerequisites are per pack (for example `nvidia-smi` for GPU packs,
+  `docker` for container packs, `systemctl` for service actions).
+- Home Assistant OS/Supervised/Container installations that can reach the
+  Leassh server over HTTP/WS.
+
+## Supported functions
+
+- Per-node health, CPU/GPU/RAM/disk, presence, sessions, entities and series.
+- Curated actions exposed as buttons and services; no arbitrary commands.
+- Fleet claims, ledger, consent and setup doctor.
+- Recipe catalog/install/configure/dry-run/enable/disable/status/fork.
+- Server-originated notifications and `leassh_event` automations.
+- Diagnostics download with tokens redacted.
+
+## Known limitations
+
+- The Windows presence sampler is the authoritative presence source; Windows
+  idle APIs were proven unreliable under controlled ground truth.
+- Sampler identity must match the console session; a stale or missing sampler
+  fails closed.
+- Per-container child devices are not created; containers are entities on the
+  host device.
+- Live recipe actions require the server live sink and a configured provider;
+  simulation is the default.
+- The 95% coverage target is measured but not yet enforced as a hard gate.
+
+## Use cases
+
+- Single-owner homelab: Monitor bundle, health/claims, safe power actions.
+- Family household: bedtime, screen-time, family summary with opt-in
+  enforcement and visible warnings.
+- SMB/fleet: patch/maintenance windows, backup freshness, canary, approvals.
+- Virtualization: Proxmox/Hyper-V guest lifecycle and backup/snapshot recipes.
+
+## Troubleshooting
+
+See `docs/troubleshooting.md` in the Leassh server repository and the repair
+issues created by the integration. Common checks:
+
+1. `Settings → Devices & Services → Leassh → Configure` for setup doctor.
+2. Download diagnostics; tokens are redacted.
+3. Check the recipe status sensor attributes for `last_error` and
+   `suppressed_reason`.
+4. Reauthenticate if the token was rotated.
+
+## Removal
+
+1. Remove the integration entry in Home Assistant.
+2. Remove the Leassh add-on/container if no longer used.
+3. Optionally delete `/config/leassh` (fleet config, recipe store, ledger) and
+   the downloaded `custom_components/leassh` directory.

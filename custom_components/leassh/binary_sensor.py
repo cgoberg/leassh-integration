@@ -19,6 +19,7 @@ from . import LeasshRuntime
 from .const import DOMAIN
 from .coordinator import LeasshCoordinator
 from .entity import (
+
     entity_unique_id,
     find_node,
     hub_device,
@@ -27,13 +28,15 @@ from .entity import (
     node_provenance,
 )
 
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    runtime: LeasshRuntime = hass.data[DOMAIN][entry.entry_id]
+    runtime: LeasshRuntime = entry.runtime_data
     coordinator = runtime.coordinator
 
     entities: list[BinarySensorEntity] = [

@@ -53,6 +53,10 @@ _STATIC_DIR = Path(__file__).parent / "static"
 
 
 def _first_runtime(hass: HomeAssistant) -> "LeasshRuntime | None":
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        runtime = getattr(entry, "runtime_data", None)
+        if isinstance(runtime, LeasshRuntime):
+            return runtime
     for value in hass.data.get(DOMAIN, {}).values():
         if isinstance(value, LeasshRuntime):
             return value
@@ -186,7 +190,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Registered for the WS watchdog: outage push delivery (notify.py
     # replaces this once its entity exists).
     hass.data[DOMAIN].setdefault("outage_notifier", None)
-    hass.data[DOMAIN][entry.entry_id] = runtime
+    entry.runtime_data = runtime
 
     # async_forward_entry_setups (not async_forward_platforms, which only
     # exists from 2024.7) — kept for older installations.
@@ -195,11 +199,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    runtime: LeasshRuntime | None = hass.data[DOMAIN].get(entry.entry_id)
+    runtime: LeasshRuntime | None = getattr(entry, "runtime_data", None)
     if runtime:
         await runtime.shutdown()
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    hass.data[DOMAIN].pop(entry.entry_id, None)
+    entry.runtime_data = None
     return unload_ok
 
 

@@ -26,6 +26,8 @@ from .entity import hub_device
 
 _LOGGER = logging.getLogger(__name__)
 
+PARALLEL_UPDATES = 0
+
 _URGENCY = ("urgent", "critical")
 
 
@@ -34,7 +36,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    runtime: LeasshRuntime = hass.data[DOMAIN][entry.entry_id]
+    runtime: LeasshRuntime = entry.runtime_data
     entity = LeasshNotifyEntity(hass, entry, runtime)
     async_add_entities([entity])
     # Wire the two delivery paths to this entity: WS notify events and the

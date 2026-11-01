@@ -273,6 +273,10 @@ class LeasshRepairFlow(RepairsFlow):
         )
 
     async def _runtime(self):
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            runtime = getattr(entry, "runtime_data", None)
+            if runtime is not None and hasattr(runtime, "client"):
+                return runtime
         for runtime in self.hass.data.get(DOMAIN, {}).values():
             if hasattr(runtime, "client"):
                 return runtime

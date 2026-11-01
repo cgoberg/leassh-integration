@@ -17,7 +17,7 @@ from .const import DOMAIN
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
-    runtime = hass.data[DOMAIN].get(entry.entry_id)
+    runtime = getattr(entry, "runtime_data", None) or hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if runtime is None:
         return {"error": "runtime not loaded"}
 

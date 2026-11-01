@@ -103,6 +103,15 @@ class LeasshConfigFlow(ConfigFlow, domain=DOMAIN):
             # A server advertising without api_port is not offering the API.
             return self.async_abort(reason="no_api")
         self._discovered_url = f"http://{discovery_info.host}:{int(api_port)}"
+        await self.async_set_unique_id(
+            f"{discovery_info.host}:{int(api_port)}"
+        )
+        # A re-discovered server updates the existing entry instead of only
+        # aborting: a DHCP address change should repair the URL, not force a
+        # delete/re-add.
+        self._abort_if_unique_id_configured(
+            updates={CONF_SERVER_URL: self._discovered_url}
+        )
         return await self.async_step_zeroconf_confirm()
 
     async def async_step_zeroconf_confirm(

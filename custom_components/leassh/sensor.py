@@ -17,6 +17,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
+    EntityCategory,
     PERCENTAGE,
     UnitOfInformation,
     UnitOfTemperature,
@@ -31,6 +32,7 @@ from . import LeasshRuntime
 from .const import DOMAIN
 from .coordinator import LeasshCoordinator
 from .entity import (
+
     entity_unique_id,
     find_node,
     hub_device,
@@ -38,6 +40,8 @@ from .entity import (
     node_host,
     node_provenance,
 )
+
+PARALLEL_UPDATES = 0
 
 
 
@@ -163,7 +167,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    runtime: LeasshRuntime = hass.data[DOMAIN][entry.entry_id]
+    runtime: LeasshRuntime = entry.runtime_data
     coordinator = runtime.coordinator
 
     seen: set[str] = set()
@@ -807,6 +811,8 @@ class LeasshPackSuggestionsSensor(CoordinatorEntity[LeasshCoordinator], SensorEn
     _attr_has_entity_name = True
     _attr_translation_key = "suggested_packs"
     _attr_icon = "mdi:puzzle-plus"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
 
     def __init__(self, entry: ConfigEntry, runtime: LeasshRuntime) -> None:
         super().__init__(runtime.coordinator)
@@ -846,6 +852,7 @@ class LeasshLicenseSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "license"
     _attr_icon = "mdi:license"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, entry: ConfigEntry, runtime: LeasshRuntime) -> None:
         super().__init__(runtime.coordinator)

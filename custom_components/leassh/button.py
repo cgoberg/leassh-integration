@@ -12,6 +12,7 @@ import logging
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -21,6 +22,8 @@ from .const import DOMAIN
 from .entity import entity_unique_id, node_device, node_host, title_case
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 0
 
 _ICON_BY_VERB = {
     "reboot_node": "mdi:restart",
@@ -37,7 +40,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    runtime: LeasshRuntime = hass.data[DOMAIN][entry.entry_id]
+    runtime: LeasshRuntime = entry.runtime_data
 
     # The catalog is a server-side product decision; fetch once at setup.
     try:
@@ -123,7 +126,15 @@ class ActionButton(ButtonEntity):
             result = await self._runtime.client.action(node, self._verb)
         except LeasshApiError as err:
             _LOGGER.error("Leassh action %s/%s failed: %s", node, self._verb, err)
-            raise
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="action_failed",
+                translation_placeholders={
+                    "action": self._verb,
+                    "node": node,
+                    "error": str(err),
+                },
+            ) from err
         _LOGGER.info("Leassh action %s/%s ok: %s", node, self._verb, result)
 
     def _node_name(self) -> str | None:

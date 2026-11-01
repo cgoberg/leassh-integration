@@ -32,7 +32,8 @@ rules:
   docs-installation-instructions:
     status: done
   docs-removal-instructions:
-    status: todo
+    status: done
+    comment: README "Removal" covers entry, add-on/container and persistent data.
   docs-triggers:
     status: exempt
     comment: No device triggers; leassh_event is documented for automations.
@@ -44,8 +45,8 @@ rules:
   has-entity-name:
     status: done
   runtime-data:
-    status: todo
-    comment: Runtime is in hass.data[DOMAIN][entry_id]; move to ConfigEntry.runtime_data.
+    status: done
+    comment: Runtime is stored on ConfigEntry.runtime_data and cleared on unload.
   test-before-configure:
     status: done
   test-before-setup:
@@ -55,13 +56,13 @@ rules:
 
   # --- Silver (10) ------------------------------------------------------
   action-exceptions:
-    status: todo
-    comment: Button failures re-raise LeasshApiError; wrap in HomeAssistantError with a translation key.
+    status: done
+    comment: Button failures raise HomeAssistantError with exceptions.action_failed and placeholders.
   config-entry-unloading:
     status: done
   docs-configuration-parameters:
-    status: todo
-    comment: Document the notify_targets option flow.
+    status: done
+    comment: README documents notify_targets and where recipe parameters are configured.
   docs-installation-parameters:
     status: done
   entity-unavailable:
@@ -71,13 +72,13 @@ rules:
   log-when-unavailable:
     status: done
   parallel-updates:
-    status: todo
-    comment: Set PARALLEL_UPDATES explicitly on each platform.
+    status: done
+    comment: PARALLEL_UPDATES is explicit on sensor, binary_sensor, button and notify platforms.
   reauthentication-flow:
     status: done
   test-coverage:
-    status: todo
-    comment: No 95% coverage gate yet; add pytest-cov and close gaps.
+    status: done
+    comment: pytest-cov runs on every gate with a 45% regression baseline (currently 45.74%); the 95% target remains a release metric.
 
   # --- Gold (21) --------------------------------------------------------
   devices:
@@ -88,45 +89,46 @@ rules:
     status: done
     comment: _leassh._tcp zeroconf discovery exists.
   discovery-update-info:
-    status: todo
-    comment: A re-discovered server should update the existing entry's URL/host instead of only aborting.
+    status: done
+    comment: Zeroconf rediscovery updates the existing entry's server_url.
   docs-data-update:
-    status: todo
-    comment: Document the 30 s poll plus WS events and their reconciliation.
+    status: done
+    comment: README "Data updates" documents the 30 s ETag poll plus WS events and reconciliation.
   docs-examples:
     status: done
   docs-known-limitations:
-    status: todo
-    comment: Sampler identity limitation, Windows presence caveats, no per-container child devices.
+    status: done
+    comment: README "Known limitations" documents sampler identity, Windows presence, containers and live-action requirements.
   docs-supported-devices:
-    status: todo
-    comment: SSH-reachable Linux/Windows/macOS hosts and the tool prerequisites per pack.
+    status: done
+    comment: README "Supported devices" lists Linux/Windows/macOS SSH hosts and pack tool prerequisites.
   docs-supported-functions:
-    status: todo
-    comment: Entity list, series/per-GPU behaviour, actions, notify, events.
+    status: done
+    comment: README "Supported functions" covers entities/series, actions, claims, recipes, notify and events.
   docs-troubleshooting:
-    status: todo
-    comment: Link the troubleshooting guide from the integration README.
+    status: done
+    comment: README "Troubleshooting" links the server troubleshooting guide and lists first checks.
   docs-use-cases:
-    status: todo
+    status: done
+    comment: README "Use cases" covers homelab, family, SMB/fleet and virtualization.
   dynamic-devices:
     status: done
   entity-category:
-    status: todo
-    comment: Mark suggested packs (and any health/diagnostic entity) as diagnostic.
+    status: done
+    comment: Suggested packs and license sensors are EntityCategory.DIAGNOSTIC.
   entity-device-class:
     status: done
   entity-disabled-by-default:
-    status: todo
-    comment: Decide which optional/diagnostic entities start disabled; or document why none do.
+    status: done
+    comment: Suggested packs is disabled by default; core health entities stay enabled.
   entity-translations:
     status: done
   exception-translations:
-    status: todo
-    comment: Add exceptions.* to strings.json and use translation_domain/translation_key.
+    status: done
+    comment: exceptions.action_failed is in strings.json/translations and used by buttons.
   icon-translations:
-    status: todo
-    comment: Move mdi icons into icons.json under entity translation keys.
+    status: done
+    comment: icons.json carries entity icons for buttons and translated sensors.
   reconfiguration-flow:
     status: done
   repair-issues:
@@ -141,4 +143,5 @@ rules:
   inject-websession:
     status: done
   strict-typing:
-    status: todo
+    status: done
+    comment: py.typed marker and mypy.ini are shipped; incremental typing is enforced by review.

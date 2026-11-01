@@ -1,0 +1,20 @@
+{
+  "entity": {
+    "button": {
+      "reboot_node": { "default": "mdi:restart" },
+      "sign_out_session": { "default": "mdi:logout" }
+    },
+    "sensor": {
+      "suggested_packs": { "default": "mdi:puzzle-plus" },
+      "license": { "default": "mdi:license" },
+      "activity": { "default": "mdi:account-clock" },
+      "cpu_usage": { "default": "mdi:cpu-64-bit" },
+      "ram_percent": { "default": "mdi:memory" },
+      "disk_free": { "default": "mdi:harddisk" },
+      "gpu_usage": { "default": "mdi:expansion-card" },
+      "idle": { "default": "mdi:timer-outline" },
+      "presence_idle": { "default": "mdi:human-male" },
+      "load": { "default": "mdi:speedometer" }
+    }
+  }
+}
