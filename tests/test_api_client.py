@@ -96,6 +96,9 @@ async def test_read_and_action_methods_use_the_expected_paths() -> None:
     assert await api.capability_manifest() == {"ok": True}
     assert await api.get_pack_suggestions() == {"ok": True}
     assert await api.get_actions() == {"ok": True}
+    assert await api.action_requests() == {"ok": True}
+    assert await api.approve_action("a1", "owner") == {"ok": True}
+    assert await api.deny_action("a1", "owner") == {"ok": True}
     assert await api.action("rig", "reboot_node") == {"ok": True}
     assert await api.notify({"title": "t"}) == {"ok": True}
     paths = [call[1] for call in session.calls]
@@ -192,6 +195,9 @@ async def test_every_wrapper_raises_api_error_on_500() -> None:
         lambda: api.reload_packs(),
         lambda: api.set_pack_enabled("p", True),
         lambda: api.get_actions(),
+        lambda: api.action_requests(),
+        lambda: api.approve_action("a1", "owner"),
+        lambda: api.deny_action("a1", "owner"),
         lambda: api.action("rig", "reboot_node"),
         lambda: api.notify({"title": "t"}),
     ]

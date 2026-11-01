@@ -122,6 +122,24 @@ def _register_services(hass: HomeAssistant) -> None:
             int(call.data.get("idle_minutes", 15)),
         )
 
+    async def approve_action(call) -> None:
+        runtime = _first_runtime(hass)
+        if runtime is None:
+            raise RuntimeError("Leassh is not configured")
+        await runtime.client.approve_action(
+            call.data["request_id"], call.data.get("principal", "owner")
+        )
+        await runtime.coordinator.async_refresh()
+
+    async def deny_action(call) -> None:
+        runtime = _first_runtime(hass)
+        if runtime is None:
+            raise RuntimeError("Leassh is not configured")
+        await runtime.client.deny_action(
+            call.data["request_id"], call.data.get("principal", "owner")
+        )
+        await runtime.coordinator.async_refresh()
+
     async def set_protection_profile(call) -> None:
         runtime = _first_runtime(hass)
         if runtime is None:
@@ -142,6 +160,8 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN, "set_protection_profile", set_protection_profile
     )
+    hass.services.async_register(DOMAIN, "approve_action", approve_action)
+    hass.services.async_register(DOMAIN, "deny_action", deny_action)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:

@@ -342,6 +342,38 @@ class LeasshClient:
                 raise LeasshApiError(f"pack {verb} failed: {body}")
             return body
 
+    async def action_requests(self, status: str = "pending") -> dict[str, Any]:
+        """Pending/approved/denied approval requests."""
+        resp = await self._request("GET", f"/api/actions/requests?status={status}")
+        async with resp:
+            if resp.status != 200:
+                raise LeasshApiError(f"/api/actions/requests returned {resp.status}")
+            return await resp.json()
+
+    async def approve_action(self, request_id: str, principal: str) -> dict[str, Any]:
+        resp = await self._request(
+            "POST",
+            f"/api/actions/{request_id}/approve",
+            json={"principal": principal},
+        )
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"approve action failed: {payload}")
+            return payload
+
+    async def deny_action(self, request_id: str, principal: str) -> dict[str, Any]:
+        resp = await self._request(
+            "POST",
+            f"/api/actions/{request_id}/deny",
+            json={"principal": principal},
+        )
+        async with resp:
+            payload = await resp.json(content_type=None)
+            if resp.status != 200:
+                raise LeasshApiError(f"deny action failed: {payload}")
+            return payload
+
     async def get_actions(self) -> dict[str, Any]:
         """The curated verb catalog."""
         resp = await self._request("GET", "/api/actions")

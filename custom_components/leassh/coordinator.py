@@ -75,6 +75,7 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.recipes: dict[str, Any] = {}
         self.recipe_instances: list[dict[str, Any]] = []
         self.capabilities: dict[str, Any] = {}
+        self.approvals: dict[str, Any] = {}
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
@@ -106,6 +107,10 @@ class LeasshCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.capabilities = await self.client.capability_manifest()
         except (LeasshApiError, LeasshConnectionError):
             self.capabilities = {}
+        try:
+            self.approvals = await self.client.action_requests("pending")
+        except (LeasshApiError, LeasshConnectionError):
+            self.approvals = {}
         if data is None:  # 304: nothing changed
             assert self.data is not None
             return self.data

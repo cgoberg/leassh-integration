@@ -180,6 +180,9 @@
       },
       "recipes_installed": {
         "name": "Recipes installed"
+      },
+      "approvals_pending": {
+        "name": "Pending approvals"
       }
     },
     "button": {

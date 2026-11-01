@@ -57,6 +57,7 @@ class FakeCoordinator:
         self.data = {"nodes": nodes}
         self.listeners = []
         self.recipe_instances = []
+        self.approvals = {}
 
     def async_add_listener(self, callback):
         self.listeners.append(callback)
@@ -123,6 +124,7 @@ async def test_hub_sensors_cover_fleet_consent_setup_and_recipes(hass) -> None:
     coordinator.consent = {"total": 1, "statement": "s", "nodes": []}
     coordinator.setup = {"ok": False, "pending_steps": 2, "steps": [], "profile": "guardian", "version": "0.3.0"}
     coordinator.recipes = {"catalog": [{}], "installed": [{}], "instances": [{}]}
+    coordinator.approvals = {"requests": [{"id": "a1"}]}
     for description in HUB_SENSORS:
         sensor = LeasshHubSensor(entry, runtime, description)
         value = sensor.native_value

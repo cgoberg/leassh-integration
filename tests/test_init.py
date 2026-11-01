@@ -70,6 +70,12 @@ class FakeClient:
     async def set_protection_profile(self, profile, confirmation=None):
         self.calls.append(("profile", profile, confirmation))
 
+    async def approve_action(self, request_id, principal):
+        self.calls.append(("approve", request_id, principal))
+
+    async def deny_action(self, request_id, principal):
+        self.calls.append(("deny", request_id, principal))
+
 
 def make_entry(runtime=None) -> MockConfigEntry:
     entry = MockConfigEntry(
@@ -123,9 +129,15 @@ async def test_services_cover_all_control_plane_actions(hass) -> None:
     await hass.services.async_call(
         DOMAIN, "set_protection_profile", {"profile": "guardian"}, blocking=True
     )
+    await hass.services.async_call(
+        DOMAIN, "approve_action", {"request_id": "a1", "principal": "owner"}, blocking=True
+    )
+    await hass.services.async_call(
+        DOMAIN, "deny_action", {"request_id": "a1", "principal": "owner"}, blocking=True
+    )
     assert result["ok"] is True
     assert ("add", {"name": "rig", "host": "h", "ssh": "u@h"}) in client.calls
-    assert coordinator.refreshed == 6
+    assert coordinator.refreshed == 8
 
 
 async def test_services_without_runtime_raise(hass) -> None:

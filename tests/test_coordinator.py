@@ -52,6 +52,9 @@ class FakeClient:
     async def capability_manifest(self):
         return await self._optional({"capabilities": []})
 
+    async def action_requests(self, status="pending"):
+        return await self._optional({"requests": []})
+
     async def health(self):
         return await self._optional({"license": {"valid": True}})
 

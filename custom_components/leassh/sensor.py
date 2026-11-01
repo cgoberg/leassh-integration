@@ -645,6 +645,14 @@ HUB_SENSORS: tuple[HubSensorDescription, ...] = (
         attributes=("catalog_count", "installed_count", "instance_count", "bundles"),
         source="recipes",
     ),
+    HubSensorDescription(
+        "approvals_pending",
+        "Pending approvals",
+        "mdi:shield-alert-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+        attributes=("requests",),
+        source="approvals",
+    ),
 )
 
 
@@ -686,6 +694,8 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
             return self.coordinator.setup or {}
         if self._description.source == "recipes":
             return self.coordinator.recipes or {}
+        if self._description.source == "approvals":
+            return self.coordinator.approvals or {}
         return self.coordinator.fleet or {}
 
     @property
@@ -722,6 +732,8 @@ class LeasshHubSensor(CoordinatorEntity[LeasshCoordinator], SensorEntity):
             return "ready" if data.get("ok") else "needs_attention"
         if key == "recipes_installed":
             return len((self.coordinator.recipes or {}).get("installed") or [])
+        if key == "approvals_pending":
+            return len(data.get("requests") or [])
         return data.get(key)
 
     @property

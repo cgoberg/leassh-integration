@@ -89,3 +89,26 @@ set_protection_profile:
     confirmation:
       selector:
         text:
+
+approve_action:
+  name: Approve action
+  description: Approve a pending curated action request.
+  fields:
+    request_id:
+      required: true
+      selector:
+        text:
+    principal:
+      selector:
+        text:
+deny_action:
+  name: Deny action
+  description: Deny a pending curated action request.
+  fields:
+    request_id:
+      required: true
+      selector:
+        text:
+    principal:
+      selector:
+        text:
