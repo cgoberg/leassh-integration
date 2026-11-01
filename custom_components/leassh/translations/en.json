@@ -44,12 +44,12 @@
     "step": {
       "init": {
         "description": "Configure notifications, add a node, choose the protection profile, or manage recipes.",
-        "menu_options": [
-          "notify",
-          "add_node",
-          "protection",
-          "recipes"
-        ],
+        "menu_options": {
+          "notify": "Notifications",
+          "add_node": "Add a node",
+          "protection": "Protection profile",
+          "recipes": "Recipes"
+        },
         "data": {
           "notify_targets": "Companion-app notify targets (comma-separated notify service names)"
         }

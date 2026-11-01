@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from types import SimpleNamespace
 
 import aiohttp
@@ -163,7 +164,7 @@ async def test_call_returns_result_and_raises_on_error() -> None:
 def test_outage_alert_fires_once() -> None:
     hass = FakeHass()
     client, _, _, _ = make_client(hass=hass)
-    client.last_frame_monotonic = 0.0
+    client.last_frame_monotonic = time.monotonic() - 400.0
     client._check_outage_alert()
     assert len(hass.created) == 1
     for created in hass.created:
@@ -286,7 +287,7 @@ def test_outage_notifier_is_used_when_present() -> None:
 
     hass.data[DOMAIN] = {"outage_notifier": notify}
     client, _, _, _ = make_client(hass=hass)
-    client.last_frame_monotonic = 0.0
+    client.last_frame_monotonic = time.monotonic() - 400.0
     client._check_outage_alert()
     for created in hass.created:
         if hasattr(created, "close"):
